@@ -24,12 +24,22 @@ KioskCore::KioskCore() : isKioskActive_(false) {
     systemAllowedPackages_.insert("com.android.permissioncontroller");
     systemAllowedPackages_.insert("com.google.android.packageinstaller");
     systemAllowedPackages_.insert("com.android.packageinstaller");
+    systemAllowedPackages_.insert("com.google.android.gms");
+    systemAllowedPackages_.insert("android.ext.services");
 
-    // Keyboards
+    // Standard keyboards and OEM input methods
     systemAllowedPackages_.insert("com.google.android.inputmethod.latin");
+    systemAllowedPackages_.insert("com.sec.android.inputmethod");
+    systemAllowedPackages_.insert("com.sec.android.inputmethod.i18n");
     systemAllowedPackages_.insert("com.samsung.android.honeyboard");
     systemAllowedPackages_.insert("com.touchtype.swiftkey");
     systemAllowedPackages_.insert("com.android.inputmethod.latin");
+    systemAllowedPackages_.insert("com.baidu.input_yousa");
+    systemAllowedPackages_.insert("com.coloros.keyboard");
+    systemAllowedPackages_.insert("com.oppo.keyboard");
+    systemAllowedPackages_.insert("com.vivo.ime");
+    systemAllowedPackages_.insert("com.miui.virtualsim");
+    systemAllowedPackages_.insert("com.facemoji.lite.xiaomi");
 }
 
 void KioskCore::initialize(const std::string& storageDir) {
@@ -137,6 +147,27 @@ bool KioskCore::verifyPin(const std::string& pin) {
     return (computedHash == storedPinHash_);
 }
 
+bool KioskCore::changePin(const std::string& oldPin, const std::string& newPin) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (storedPinHash_.empty() || oldPin.empty() || newPin.empty()) {
+        return false;
+    }
+    // Verify old PIN
+    std::string oldSalted = std::string(SALT_PREFIX) + oldPin;
+    std::string computedOldHash = SHA256::hash(oldSalted);
+    if (computedOldHash != storedPinHash_) {
+        LOGD("Failed to change PIN: old PIN mismatch.");
+        return false;
+    }
+
+    // Save new PIN
+    std::string newSalted = std::string(SALT_PREFIX) + newPin;
+    std::string newHash = SHA256::hash(newSalted);
+    savePinHash(newHash);
+    LOGD("PIN changed successfully.");
+    return true;
+}
+
 bool KioskCore::startKiosk(const std::string& targetPackage) {
     std::lock_guard<std::mutex> lock(mutex_);
     if (targetPackage.empty() || storedPinHash_.empty()) {
@@ -178,6 +209,14 @@ std::string KioskCore::getTargetPackage() {
     return targetPackage_;
 }
 
+void KioskCore::addAllowedPackage(const std::string& packageName) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (!packageName.empty()) {
+        systemAllowedPackages_.insert(packageName);
+        LOGD("Dynamically allowed package added: %s", packageName.c_str());
+    }
+}
+
 bool KioskCore::isPackageAllowed(const std::string& packageName) {
     std::lock_guard<std::mutex> lock(mutex_);
     if (!isKioskActive_) {
@@ -196,12 +235,15 @@ bool KioskCore::isPackageAllowed(const std::string& packageName) {
         return true;
     }
 
-    // Permit soft keyboard / input methods so PIN and app inputs work without interruption
+    // Permit all keyboards, input methods, and autofill components without blocking
     if (packageName.find("inputmethod") != std::string::npos ||
         packageName.find("keyboard") != std::string::npos ||
         packageName.find("honeyboard") != std::string::npos ||
         packageName.find("swiftkey") != std::string::npos ||
-        packageName.find("ime") != std::string::npos) {
+        packageName.find("ime") != std::string::npos ||
+        packageName.find("latin") != std::string::npos ||
+        packageName.find("autofill") != std::string::npos ||
+        packageName.find("touchtype") != std::string::npos) {
         return true;
     }
 

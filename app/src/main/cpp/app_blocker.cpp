@@ -39,6 +39,13 @@ Java_com_appblocker_kiosk_NativeKioskManager_nativeVerifyPin(JNIEnv* env, jclass
 }
 
 JNIEXPORT jboolean JNICALL
+Java_com_appblocker_kiosk_NativeKioskManager_nativeChangePin(JNIEnv* env, jclass /* clazz */, jstring oldPin, jstring newPin) {
+    std::string oldP = jstringToString(env, oldPin);
+    std::string newP = jstringToString(env, newPin);
+    return appblocker::KioskCore::getInstance().changePin(oldP, newP) ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT jboolean JNICALL
 Java_com_appblocker_kiosk_NativeKioskManager_nativeStartKiosk(JNIEnv* env, jclass /* clazz */, jstring packageName) {
     std::string pkg = jstringToString(env, packageName);
     return appblocker::KioskCore::getInstance().startKiosk(pkg) ? JNI_TRUE : JNI_FALSE;
@@ -65,6 +72,12 @@ JNIEXPORT jboolean JNICALL
 Java_com_appblocker_kiosk_NativeKioskManager_nativeIsPackageAllowed(JNIEnv* env, jclass /* clazz */, jstring packageName) {
     std::string pkg = jstringToString(env, packageName);
     return appblocker::KioskCore::getInstance().isPackageAllowed(pkg) ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT void JNICALL
+Java_com_appblocker_kiosk_NativeKioskManager_nativeAddAllowedPackage(JNIEnv* env, jclass /* clazz */, jstring packageName) {
+    std::string pkg = jstringToString(env, packageName);
+    appblocker::KioskCore::getInstance().addAllowedPackage(pkg);
 }
 
 } // extern "C"

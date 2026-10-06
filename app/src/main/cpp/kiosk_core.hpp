@@ -16,6 +16,7 @@ public:
     bool hasPin();
     bool setPin(const std::string& pin);
     bool verifyPin(const std::string& pin);
+    bool changePin(const std::string& oldPin, const std::string& newPin);
 
     bool startKiosk(const std::string& targetPackage);
     bool stopKiosk(const std::string& pin);
@@ -24,6 +25,7 @@ public:
     std::string getTargetPackage();
 
     bool isPackageAllowed(const std::string& packageName);
+    void addAllowedPackage(const std::string& packageName);
 
 private:
     KioskCore();

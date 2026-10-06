@@ -119,6 +119,11 @@ public class MainActivity extends AppCompatActivity implements AppAdapter.OnAppS
 
         btnStartKiosk.setOnClickListener(v -> startKioskMode());
 
+        Button btnOpenChangePin = findViewById(R.id.btnOpenChangePin);
+        if (btnOpenChangePin != null) {
+            btnOpenChangePin.setOnClickListener(v -> showChangePinDialog());
+        }
+
         etSearch.addTextChangedListener(new TextWatcher() {
             @Override
             public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
@@ -139,6 +144,66 @@ public class MainActivity extends AppCompatActivity implements AppAdapter.OnAppS
         if (!NativeKioskManager.nativeHasPin()) {
             showSetPinDialog(false);
         }
+    }
+
+    private void showChangePinDialog() {
+        if (!NativeKioskManager.nativeHasPin()) {
+            showSetPinDialog(false);
+            return;
+        }
+
+        Dialog dialog = new Dialog(this);
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        dialog.setContentView(R.layout.dialog_change_pin);
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+        }
+        dialog.setCancelable(true);
+
+        EditText etOldPin = dialog.findViewById(R.id.etOldPin);
+        EditText etNewPinChange = dialog.findViewById(R.id.etNewPinChange);
+        EditText etConfirmPinChange = dialog.findViewById(R.id.etConfirmPinChange);
+        TextView tvError = dialog.findViewById(R.id.tvChangePinError);
+        Button btnSubmit = dialog.findViewById(R.id.btnSubmitChangePin);
+        Button btnCancel = dialog.findViewById(R.id.btnCancelChangePin);
+
+        btnCancel.setOnClickListener(v -> dialog.dismiss());
+
+        btnSubmit.setOnClickListener(v -> {
+            String oldPin = etOldPin.getText().toString().trim();
+            String newPin = etNewPinChange.getText().toString().trim();
+            String confirmPin = etConfirmPinChange.getText().toString().trim();
+
+            if (TextUtils.isEmpty(oldPin)) {
+                tvError.setText("Masukkan PIN lama!");
+                return;
+            }
+            if (TextUtils.isEmpty(newPin)) {
+                tvError.setText("Masukkan PIN baru!");
+                return;
+            }
+            if (newPin.length() < 4) {
+                tvError.setText("PIN baru minimal 4 angka / karakter!");
+                return;
+            }
+            if (!newPin.equals(confirmPin)) {
+                tvError.setText("Konfirmasi PIN baru tidak cocok!");
+                return;
+            }
+
+            // Native C++ verify old PIN and update to new PIN
+            boolean changed = NativeKioskManager.nativeChangePin(oldPin, newPin);
+            if (changed) {
+                Toast.makeText(this, "PIN berhasil diperbarui!", Toast.LENGTH_SHORT).show();
+                dialog.dismiss();
+            } else {
+                tvError.setText("PIN lama salah! Gagal memperbarui PIN.");
+                etOldPin.setText("");
+                etOldPin.requestFocus();
+            }
+        });
+
+        dialog.show();
     }
 
     private void showSetPinDialog(boolean cancelable) {

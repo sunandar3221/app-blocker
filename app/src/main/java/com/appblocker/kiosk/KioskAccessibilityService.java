@@ -1,12 +1,16 @@
 package com.appblocker.kiosk;
 
 import android.accessibilityservice.AccessibilityService;
+import android.content.Context;
 import android.content.Intent;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
 import android.view.accessibility.AccessibilityEvent;
+import android.view.inputmethod.InputMethodInfo;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.Toast;
+import java.util.List;
 
 public class KioskAccessibilityService extends AccessibilityService {
 
@@ -40,18 +44,62 @@ public class KioskAccessibilityService extends AccessibilityService {
                 return;
             }
 
+            // If user is currently on the Unlock / PIN screen, NEVER block or close keyboard!
+            if (UnlockActivity.isUnlockScreenActive) {
+                return;
+            }
+
             CharSequence packageNameChar = event.getPackageName();
             if (packageNameChar == null) return;
             String packageName = packageNameChar.toString();
 
-            // Native C++ check: is this package permitted while kiosk is running?
-            if (!NativeKioskManager.nativeIsPackageAllowed(packageName)) {
-                Log.w(TAG, "Unauthorized app detected in kiosk mode: " + packageName);
-                blockAndRedirect(packageName);
+            // Allow our own app windows (dialogs, activities)
+            if (packageName.equals(getPackageName())) {
+                return;
             }
+
+            // Allow soft keyboards and input methods
+            if (isInputMethod(packageName)) {
+                return;
+            }
+
+            // Native C++ check: is this package permitted while kiosk is running?
+            if (NativeKioskManager.nativeIsPackageAllowed(packageName)) {
+                return;
+            }
+
+            Log.w(TAG, "Unauthorized app detected in kiosk mode: " + packageName);
+            blockAndRedirect(packageName);
         } catch (Throwable t) {
             Log.e(TAG, "Unhandled error in onAccessibilityEvent", t);
         }
+    }
+
+    private boolean isInputMethod(String packageName) {
+        if (packageName == null || packageName.isEmpty()) return true;
+        try {
+            InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+            if (imm != null) {
+                List<InputMethodInfo> imes = imm.getEnabledInputMethodList();
+                if (imes != null) {
+                    for (InputMethodInfo imi : imes) {
+                        if (packageName.equals(imi.getPackageName())) {
+                            return true;
+                        }
+                    }
+                }
+            }
+        } catch (Throwable ignored) {}
+
+        String lower = packageName.toLowerCase();
+        return lower.contains("inputmethod") ||
+               lower.contains("keyboard") ||
+               lower.contains("honeyboard") ||
+               lower.contains("swiftkey") ||
+               lower.contains("ime") ||
+               lower.contains("latin") ||
+               lower.contains("autofill") ||
+               lower.contains("touchtype");
     }
 
     private synchronized void blockAndRedirect(String attemptedPackage) {

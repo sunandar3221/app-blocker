@@ -11,6 +11,8 @@ import androidx.appcompat.app.AppCompatActivity;
 
 public class UnlockActivity extends AppCompatActivity {
 
+    public static volatile boolean isUnlockScreenActive = false;
+
     private EditText etPin;
     private TextView tvError;
 
@@ -26,6 +28,8 @@ public class UnlockActivity extends AppCompatActivity {
         Button btnUnlock = findViewById(R.id.btnConfirmUnlock);
         Button btnCancel = findViewById(R.id.btnCancelUnlock);
 
+        setupKeypad();
+
         btnUnlock.setOnClickListener(v -> attemptUnlock());
         btnCancel.setOnClickListener(v -> returnToKioskApp());
 
@@ -33,6 +37,61 @@ public class UnlockActivity extends AppCompatActivity {
             attemptUnlock();
             return true;
         });
+    }
+
+    private void setupKeypad() {
+        int[] digitBtnIds = {
+            R.id.btnKey0, R.id.btnKey1, R.id.btnKey2, R.id.btnKey3, R.id.btnKey4,
+            R.id.btnKey5, R.id.btnKey6, R.id.btnKey7, R.id.btnKey8, R.id.btnKey9
+        };
+
+        for (int i = 0; i <= 9; i++) {
+            final String digit = String.valueOf(i);
+            Button btn = findViewById(digitBtnIds[i]);
+            if (btn != null) {
+                btn.setOnClickListener(v -> {
+                    tvError.setText("");
+                    etPin.append(digit);
+                });
+            }
+        }
+
+        Button btnClear = findViewById(R.id.btnKeyClear);
+        if (btnClear != null) {
+            btnClear.setOnClickListener(v -> {
+                etPin.setText("");
+                tvError.setText("");
+            });
+        }
+
+        Button btnBack = findViewById(R.id.btnKeyBack);
+        if (btnBack != null) {
+            btnBack.setOnClickListener(v -> {
+                String cur = etPin.getText().toString();
+                if (!cur.isEmpty()) {
+                    etPin.setText(cur.substring(0, cur.length() - 1));
+                    etPin.setSelection(etPin.getText().length());
+                }
+            });
+        }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        isUnlockScreenActive = true;
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        isUnlockScreenActive = false;
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        isUnlockScreenActive = false;
     }
 
     private void attemptUnlock() {
