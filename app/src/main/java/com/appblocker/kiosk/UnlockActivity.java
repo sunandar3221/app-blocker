@@ -3,7 +3,6 @@ package com.appblocker.kiosk;
 import android.content.Intent;
 import android.os.Bundle;
 import android.text.TextUtils;
-import android.view.KeyEvent;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
@@ -28,7 +27,6 @@ public class UnlockActivity extends AppCompatActivity {
         Button btnCancel = findViewById(R.id.btnCancelUnlock);
 
         btnUnlock.setOnClickListener(v -> attemptUnlock());
-
         btnCancel.setOnClickListener(v -> returnToKioskApp());
 
         etPin.setOnEditorActionListener((v, actionId, event) -> {
@@ -50,9 +48,9 @@ public class UnlockActivity extends AppCompatActivity {
             // Stop floating bubble service
             Intent stopFloating = new Intent(this, FloatingExitService.class);
             stopFloating.setAction(FloatingExitService.ACTION_STOP);
-            startService(stopFloating);
+            stopService(stopFloating);
 
-            Toast.makeText(this, "Kiosk Mode dinonaktifkan.", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "Kiosk Mode berhasil dinonaktifkan.", Toast.LENGTH_SHORT).show();
 
             // Return to main app blocker settings
             Intent mainIntent = new Intent(this, MainActivity.class);

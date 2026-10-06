@@ -16,9 +16,16 @@ KioskCore& KioskCore::getInstance() {
 }
 
 KioskCore::KioskCore() : isKioskActive_(false) {
-    // Whitelist critical helper packages like keyboards and system UI components
-    systemAllowedPackages_.insert("com.appblocker.kiosk");
+    // Whitelist core Android framework and critical system UI components
+    systemAllowedPackages_.insert("android");
     systemAllowedPackages_.insert("com.android.systemui");
+    systemAllowedPackages_.insert("com.appblocker.kiosk");
+    systemAllowedPackages_.insert("com.google.android.permissioncontroller");
+    systemAllowedPackages_.insert("com.android.permissioncontroller");
+    systemAllowedPackages_.insert("com.google.android.packageinstaller");
+    systemAllowedPackages_.insert("com.android.packageinstaller");
+
+    // Keyboards
     systemAllowedPackages_.insert("com.google.android.inputmethod.latin");
     systemAllowedPackages_.insert("com.samsung.android.honeyboard");
     systemAllowedPackages_.insert("com.touchtype.swiftkey");
@@ -29,7 +36,9 @@ void KioskCore::initialize(const std::string& storageDir) {
     std::lock_guard<std::mutex> lock(mutex_);
     storageDir_ = storageDir;
     loadPinHash();
-    LOGD("Initialized KioskCore with storage path: %s", storageDir_.c_str());
+    loadState();
+    LOGD("Initialized KioskCore with storage path: %s (active: %d, target: %s)",
+         storageDir_.c_str(), isKioskActive_ ? 1 : 0, targetPackage_.c_str());
 }
 
 std::string KioskCore::getPinFilePath() const {
@@ -37,6 +46,13 @@ std::string KioskCore::getPinFilePath() const {
         return "kiosk_pin.bin";
     }
     return storageDir_ + "/kiosk_pin.bin";
+}
+
+std::string KioskCore::getStateFilePath() const {
+    if (storageDir_.empty()) {
+        return "kiosk_state.bin";
+    }
+    return storageDir_ + "/kiosk_state.bin";
 }
 
 void KioskCore::loadPinHash() {
@@ -62,6 +78,36 @@ void KioskCore::savePinHash(const std::string& hash) {
         LOGD("Pin hash saved successfully to %s", path.c_str());
     } else {
         LOGE("Failed to write pin hash to %s", path.c_str());
+    }
+}
+
+void KioskCore::loadState() {
+    std::string path = getStateFilePath();
+    std::ifstream file(path);
+    if (file.is_open()) {
+        std::string activeStr;
+        if (std::getline(file, activeStr)) {
+            isKioskActive_ = (activeStr == "1");
+        }
+        std::getline(file, targetPackage_);
+        file.close();
+        LOGD("Loaded kiosk state: active=%d, target=%s", isKioskActive_ ? 1 : 0, targetPackage_.c_str());
+    } else {
+        isKioskActive_ = false;
+        targetPackage_.clear();
+    }
+}
+
+void KioskCore::saveState() {
+    std::string path = getStateFilePath();
+    std::ofstream file(path, std::ios::trunc);
+    if (file.is_open()) {
+        file << (isKioskActive_ ? "1\n" : "0\n");
+        file << targetPackage_ << "\n";
+        file.close();
+        LOGD("Saved kiosk state: active=%d, target=%s", isKioskActive_ ? 1 : 0, targetPackage_.c_str());
+    } else {
+        LOGE("Failed to save kiosk state to %s", path.c_str());
     }
 }
 
@@ -99,7 +145,8 @@ bool KioskCore::startKiosk(const std::string& targetPackage) {
     }
     targetPackage_ = targetPackage;
     isKioskActive_ = true;
-    LOGD("Kiosk mode STARTED for package: %s", targetPackage.c_str());
+    saveState();
+    LOGD("Kiosk mode STARTED and PERSISTED for package: %s", targetPackage.c_str());
     return true;
 }
 
@@ -113,6 +160,7 @@ bool KioskCore::stopKiosk(const std::string& pin) {
     if (computedHash == storedPinHash_) {
         isKioskActive_ = false;
         targetPackage_.clear();
+        saveState();
         LOGD("Kiosk mode STOPPED successfully with valid PIN.");
         return true;
     }
@@ -136,6 +184,10 @@ bool KioskCore::isPackageAllowed(const std::string& packageName) {
         return true;
     }
 
+    if (packageName.empty()) {
+        return true;
+    }
+
     if (packageName == targetPackage_) {
         return true;
     }
@@ -144,11 +196,12 @@ bool KioskCore::isPackageAllowed(const std::string& packageName) {
         return true;
     }
 
-    // Permit common soft keyboard input methods so PIN and app inputs work
+    // Permit soft keyboard / input methods so PIN and app inputs work without interruption
     if (packageName.find("inputmethod") != std::string::npos ||
         packageName.find("keyboard") != std::string::npos ||
         packageName.find("honeyboard") != std::string::npos ||
-        packageName.find("swiftkey") != std::string::npos) {
+        packageName.find("swiftkey") != std::string::npos ||
+        packageName.find("ime") != std::string::npos) {
         return true;
     }
 

@@ -32,8 +32,11 @@ private:
     KioskCore& operator=(const KioskCore&) = delete;
 
     std::string getPinFilePath() const;
+    std::string getStateFilePath() const;
     void loadPinHash();
     void savePinHash(const std::string& hash);
+    void loadState();
+    void saveState();
 
     mutable std::mutex mutex_;
     std::string storageDir_;

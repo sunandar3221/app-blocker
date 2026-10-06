@@ -7,10 +7,12 @@ import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.ServiceInfo;
 import android.graphics.PixelFormat;
 import android.os.Build;
 import android.os.IBinder;
 import android.provider.Settings;
+import android.util.Log;
 import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
@@ -22,6 +24,7 @@ import androidx.core.app.NotificationCompat;
 
 public class FloatingExitService extends Service {
 
+    private static final String TAG = "FloatingExitService";
     public static final String ACTION_STOP = "com.appblocker.kiosk.ACTION_STOP";
     private static final String CHANNEL_ID = "kiosk_exit_channel";
     private static final int NOTIFICATION_ID = 1001;
@@ -32,10 +35,23 @@ public class FloatingExitService extends Service {
     @Override
     public void onCreate() {
         super.onCreate();
-        NativeKioskManager.init(getApplicationContext());
-        createNotificationChannel();
-        startForeground(NOTIFICATION_ID, buildNotification());
-        setupFloatingView();
+        try {
+            NativeKioskManager.init(getApplicationContext());
+            createNotificationChannel();
+            startAsForeground();
+            setupFloatingView();
+        } catch (Throwable t) {
+            Log.e(TAG, "Error in onCreate", t);
+        }
+    }
+
+    private void startAsForeground() {
+        Notification notification = buildNotification();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) { // Android 14+
+            startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE);
+        } else {
+            startForeground(NOTIFICATION_ID, notification);
+        }
     }
 
     @Override
@@ -52,7 +68,7 @@ public class FloatingExitService extends Service {
             NotificationChannel channel = new NotificationChannel(
                     CHANNEL_ID,
                     "Kiosk Exit Service",
-                    NotificationManager.IMPORTANCE_LOW
+                    NotificationManager.IMPORTANCE_HIGH
             );
             channel.setDescription("Layanan keluar dari Kiosk Mode");
             NotificationManager manager = getSystemService(NotificationManager.class);
@@ -73,91 +89,93 @@ public class FloatingExitService extends Service {
         );
 
         return new NotificationCompat.Builder(this, CHANNEL_ID)
-                .setContentTitle("App Blocker Kiosk Mode Aktif")
-                .setContentText("Ketuk untuk memasukkan PIN dan keluar dari Kiosk")
-                .setSmallIcon(R.drawable.ic_lock)
+                .setContentTitle("App Blocker: Kiosk Mode Aktif")
+                .setContentText("Ketuk untuk memasukkan PIN dan keluar dari Kiosk Mode")
+                .setSmallIcon(R.drawable.ic_shield)
                 .setContentIntent(pendingIntent)
+                .addAction(R.drawable.ic_lock, "KELUAR KIOSK", pendingIntent)
                 .setOngoing(true)
-                .setPriority(NotificationCompat.PRIORITY_LOW)
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .build();
     }
 
     private void setupFloatingView() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
+            Log.w(TAG, "Overlay permission not granted. Floating bubble cannot be added.");
             return;
         }
 
-        windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
-        if (windowManager == null) return;
+        try {
+            windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
+            if (windowManager == null) return;
 
-        floatingView = LayoutInflater.from(this).inflate(R.layout.layout_floating_bubble, null);
+            floatingView = LayoutInflater.from(this).inflate(R.layout.layout_floating_bubble, null);
 
-        int layoutType;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            layoutType = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY;
-        } else {
-            layoutType = WindowManager.LayoutParams.TYPE_PHONE;
-        }
+            int layoutType;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                layoutType = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY;
+            } else {
+                layoutType = WindowManager.LayoutParams.TYPE_PHONE;
+            }
 
-        final WindowManager.LayoutParams params = new WindowManager.LayoutParams(
-                WindowManager.LayoutParams.WRAP_CONTENT,
-                WindowManager.LayoutParams.WRAP_CONTENT,
-                layoutType,
-                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
-                PixelFormat.TRANSLUCENT
-        );
+            final WindowManager.LayoutParams params = new WindowManager.LayoutParams(
+                    WindowManager.LayoutParams.WRAP_CONTENT,
+                    WindowManager.LayoutParams.WRAP_CONTENT,
+                    layoutType,
+                    WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+                    PixelFormat.TRANSLUCENT
+            );
 
-        params.gravity = Gravity.TOP | Gravity.START;
-        params.x = 20;
-        params.y = 150;
+            params.gravity = Gravity.TOP | Gravity.START;
+            params.x = 40;
+            params.y = 220;
 
-        ImageView btnExit = floatingView.findViewById(R.id.btnFloatingExit);
-        btnExit.setOnClickListener(v -> {
-            Intent intent = new Intent(FloatingExitService.this, UnlockActivity.class);
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-            startActivity(intent);
-        });
+            floatingView.setOnTouchListener(new View.OnTouchListener() {
+                private int initialX, initialY;
+                private float initialTouchX, initialTouchY;
+                private long touchStartTime;
 
-        // Enable dragging the floating bubble
-        floatingView.setOnTouchListener(new View.OnTouchListener() {
-            private int initialX, initialY;
-            private float initialTouchX, initialTouchY;
-            private boolean isMoving = false;
+                @Override
+                public boolean onTouch(View v, MotionEvent event) {
+                    switch (event.getAction()) {
+                        case MotionEvent.ACTION_DOWN:
+                            initialX = params.x;
+                            initialY = params.y;
+                            initialTouchX = event.getRawX();
+                            initialTouchY = event.getRawY();
+                            touchStartTime = System.currentTimeMillis();
+                            return true;
 
-            @Override
-            public boolean onTouch(View v, MotionEvent event) {
-                switch (event.getAction()) {
-                    case MotionEvent.ACTION_DOWN:
-                        initialX = params.x;
-                        initialY = params.y;
-                        initialTouchX = event.getRawX();
-                        initialTouchY = event.getRawY();
-                        isMoving = false;
-                        return false;
-
-                    case MotionEvent.ACTION_MOVE:
-                        int dx = (int) (event.getRawX() - initialTouchX);
-                        int dy = (int) (event.getRawY() - initialTouchY);
-                        if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
-                            isMoving = true;
+                        case MotionEvent.ACTION_MOVE:
+                            int dx = (int) (event.getRawX() - initialTouchX);
+                            int dy = (int) (event.getRawY() - initialTouchY);
                             params.x = initialX + dx;
                             params.y = initialY + dy;
-                            windowManager.updateViewLayout(floatingView, params);
+                            try {
+                                windowManager.updateViewLayout(floatingView, params);
+                            } catch (Exception ignored) {}
                             return true;
-                        }
-                        return false;
 
-                    case MotionEvent.ACTION_UP:
-                        return isMoving;
+                        case MotionEvent.ACTION_UP:
+                            long duration = System.currentTimeMillis() - touchStartTime;
+                            int movedX = Math.abs((int) (event.getRawX() - initialTouchX));
+                            int movedY = Math.abs((int) (event.getRawY() - initialTouchY));
+                            if (duration < 400 && movedX < 25 && movedY < 25) {
+                                // Tap detected -> Launch Unlock screen
+                                Intent intent = new Intent(FloatingExitService.this, UnlockActivity.class);
+                                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                                startActivity(intent);
+                            }
+                            return true;
+                    }
+                    return false;
                 }
-                return false;
-            }
-        });
+            });
 
-        try {
             windowManager.addView(floatingView, params);
-        } catch (Exception e) {
-            e.printStackTrace();
+            Log.d(TAG, "Floating exit bubble added to WindowManager successfully.");
+        } catch (Throwable t) {
+            Log.e(TAG, "Failed to create floating view: " + t.getMessage(), t);
         }
     }
 
@@ -167,6 +185,7 @@ public class FloatingExitService extends Service {
         if (floatingView != null && windowManager != null) {
             try {
                 windowManager.removeView(floatingView);
+                floatingView = null;
             } catch (Exception ignored) {}
         }
     }
