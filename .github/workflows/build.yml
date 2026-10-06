@@ -58,22 +58,24 @@ jobs:
 
       - name: Publish to GitHub Releases
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.0
+          name: "App Blocker v1.0.0"
+          body: |
+            ### 🚀 App Blocker (Android Kiosk Mode)
+
+            Aplikasi Kiosk Mode Android dengan pengamanan native C++ (NDK).
+
+            **Fitur:**
+            - 🔒 Pemilihan aplikasi target untuk dikunci dalam Kiosk Mode.
+            - 🔑 Wajib setel PIN saat pertama kali masuk dan wajib verifikasi PIN untuk keluar Kiosk.
+            - 🛡️ Perlindungan ganda: Device Admin + Accessibility Service.
+            - ⚡ Native C++ engine: Salted SHA-256 PIN cryptography & whitelist filter.
+            - 🎈 Floating bubble trigger untuk kemudahan akses verifikasi keluar Kiosk.
+
+            **Unduh APK:**
+            Unduh file **AppBlocker-v1.0.0.apk** di bawah untuk diinstal pada perangkat Android Anda.
+          files: AppBlocker-v1.0.0.apk
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh release create v1.0.0 AppBlocker-v1.0.0.apk \
-            --title "App Blocker v1.0.0" \
-            --notes "### 🚀 App Blocker (Android Kiosk Mode)
-
-          Aplikasi Kiosk Mode Android dengan pengamanan native C++ (NDK).
-
-          **Fitur:**
-          - 🔒 Pemilihan aplikasi target untuk dikunci dalam Kiosk Mode.
-          - 🔑 Wajib setel PIN saat pertama kali masuk dan wajib verifikasi PIN untuk keluar Kiosk.
-          - 🛡️ Perlindungan ganda: Device Admin + Accessibility Service.
-          - ⚡ Native C++ engine: Salted SHA-256 PIN cryptography & whitelist filter.
-          - 🎈 Floating bubble trigger untuk kemudahan akses verifikasi keluar Kiosk.
-
-          **Unduh APK:**
-          Unduh file **AppBlocker-v1.0.0.apk** di bawah untuk diinstal pada perangkat Android Anda." \
-            --clobber
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
