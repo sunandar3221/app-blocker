@@ -7,6 +7,9 @@ on:
     branches: [ main, master ]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     name: Build Android APK (C++ Native NDK)
@@ -38,16 +41,39 @@ jobs:
         run: |
           gradle assembleDebug --stacktrace
 
-      - name: Locate Generated APK
-        id: apk-path
+      - name: Prepare APK for Artifact & Release
+        id: prepare-apk
         run: |
-          APK=$(find app/build/outputs/apk/debug -name "*.apk" | head -n 1)
-          echo "Found APK at: $APK"
-          echo "apk=$APK" >> $GITHUB_OUTPUT
+          RAW_APK=$(find app/build/outputs/apk/debug -name "*.apk" | head -n 1)
+          echo "Raw APK: $RAW_APK"
+          cp "$RAW_APK" AppBlocker-v1.0.0.apk
+          echo "apk_path=AppBlocker-v1.0.0.apk" >> $GITHUB_OUTPUT
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: AppBlocker-debug-apk
-          path: ${{ steps.apk-path.outputs.apk }}
+          path: ${{ steps.prepare-apk.outputs.apk_path }}
           retention-days: 14
+
+      - name: Publish to GitHub Releases
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create v1.0.0 AppBlocker-v1.0.0.apk \
+            --title "App Blocker v1.0.0" \
+            --notes "### 🚀 App Blocker (Android Kiosk Mode)
+
+          Aplikasi Kiosk Mode Android dengan pengamanan native C++ (NDK).
+
+          **Fitur:**
+          - 🔒 Pemilihan aplikasi target untuk dikunci dalam Kiosk Mode.
+          - 🔑 Wajib setel PIN saat pertama kali masuk dan wajib verifikasi PIN untuk keluar Kiosk.
+          - 🛡️ Perlindungan ganda: Device Admin + Accessibility Service.
+          - ⚡ Native C++ engine: Salted SHA-256 PIN cryptography & whitelist filter.
+          - 🎈 Floating bubble trigger untuk kemudahan akses verifikasi keluar Kiosk.
+
+          **Unduh APK:**
+          Unduh file **AppBlocker-v1.0.0.apk** di bawah untuk diinstal pada perangkat Android Anda." \
+            --clobber
