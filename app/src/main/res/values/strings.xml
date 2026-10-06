@@ -1,0 +1,12 @@
+<resources>
+    <string name="app_name">App Blocker</string>
+    <string name="title_permissions">Izin yang Dibutuhkan</string>
+    <string name="perm_device_admin">Izin Device Admin</string>
+    <string name="perm_accessibility">Izin Aksesibilitas (Kiosk)</string>
+    <string name="perm_overlay">Izin Tampilkan di Atas Aplikasi</string>
+    <string name="title_select_app">Pilih Aplikasi Kiosk</string>
+    <string name="btn_start_kiosk">Kunci Aplikasi (Mulai Kiosk)</string>
+    <string name="btn_grant">Aktifkan</string>
+    <string name="search_hint">Cari aplikasi...</string>
+    <string name="device_admin_description">Device Admin digunakan oleh App Blocker untuk mengamankan dan mengunci perangkat dalam Kiosk Mode.</string>
+</resources>

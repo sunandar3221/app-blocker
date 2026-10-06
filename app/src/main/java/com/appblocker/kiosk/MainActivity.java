@@ -1,0 +1,331 @@
+package com.appblocker.kiosk;
+
+import android.accessibilityservice.AccessibilityServiceInfo;
+import android.app.Dialog;
+import android.app.admin.DevicePolicyManager;
+import android.content.ComponentName;
+import android.content.Context;
+import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.content.pm.ResolveInfo;
+import android.graphics.Color;
+import android.graphics.drawable.ColorDrawable;
+import android.net.Uri;
+import android.os.Build;
+import android.os.Bundle;
+import android.provider.Settings;
+import android.text.Editable;
+import android.text.TextUtils;
+import android.text.TextWatcher;
+import android.view.View;
+import android.view.Window;
+import android.view.accessibility.AccessibilityManager;
+import android.widget.Button;
+import android.widget.EditText;
+import android.widget.ProgressBar;
+import android.widget.TextView;
+import android.widget.Toast;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+public class MainActivity extends AppCompatActivity implements AppAdapter.OnAppSelectedListener {
+
+    private ComponentName adminComponent;
+    private DevicePolicyManager devicePolicyManager;
+
+    private TextView tvStatusAdmin;
+    private TextView tvStatusAccessibility;
+    private TextView tvStatusOverlay;
+    private Button btnGrantAdmin;
+    private Button btnGrantAccessibility;
+    private Button btnGrantOverlay;
+
+    private RecyclerView rvApps;
+    private ProgressBar progressBar;
+    private AppAdapter appAdapter;
+    private AppInfo selectedApp = null;
+    private Button btnStartKiosk;
+    private EditText etSearch;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_main);
+
+        NativeKioskManager.init(getApplicationContext());
+
+        devicePolicyManager = (DevicePolicyManager) getSystemService(Context.DEVICE_POLICY_SERVICE);
+        adminComponent = new ComponentName(this, KioskDeviceAdminReceiver.class);
+
+        initViews();
+        checkFirstTimePin();
+        loadInstalledApps();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        updatePermissionsUI();
+    }
+
+    private void initViews() {
+        tvStatusAdmin = findViewById(R.id.tvStatusAdmin);
+        tvStatusAccessibility = findViewById(R.id.tvStatusAccessibility);
+        tvStatusOverlay = findViewById(R.id.tvStatusOverlay);
+
+        btnGrantAdmin = findViewById(R.id.btnGrantAdmin);
+        btnGrantAccessibility = findViewById(R.id.btnGrantAccessibility);
+        btnGrantOverlay = findViewById(R.id.btnGrantOverlay);
+
+        rvApps = findViewById(R.id.rvApps);
+        progressBar = findViewById(R.id.progressBar);
+        btnStartKiosk = findViewById(R.id.btnStartKiosk);
+        etSearch = findViewById(R.id.etSearch);
+
+        rvApps.setLayoutManager(new LinearLayoutManager(this));
+
+        btnGrantAdmin.setOnClickListener(v -> requestDeviceAdmin());
+        btnGrantAccessibility.setOnClickListener(v -> requestAccessibility());
+        btnGrantOverlay.setOnClickListener(v -> requestOverlay());
+
+        btnStartKiosk.setOnClickListener(v -> startKioskMode());
+
+        etSearch.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                if (appAdapter != null) {
+                    appAdapter.filter(s.toString());
+                }
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) {}
+        });
+    }
+
+    private void checkFirstTimePin() {
+        if (!NativeKioskManager.nativeHasPin()) {
+            showSetPinDialog(false);
+        }
+    }
+
+    private void showSetPinDialog(boolean cancelable) {
+        Dialog dialog = new Dialog(this);
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        dialog.setContentView(R.layout.dialog_set_pin);
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+        }
+        dialog.setCancelable(cancelable);
+
+        EditText etNewPin = dialog.findViewById(R.id.etNewPin);
+        EditText etConfirmPin = dialog.findViewById(R.id.etConfirmPin);
+        TextView tvError = dialog.findViewById(R.id.tvPinError);
+        Button btnSavePin = dialog.findViewById(R.id.btnSavePin);
+
+        btnSavePin.setOnClickListener(v -> {
+            String pin = etNewPin.getText().toString().trim();
+            String confirm = etConfirmPin.getText().toString().trim();
+
+            if (TextUtils.isEmpty(pin)) {
+                tvError.setText("PIN tidak boleh kosong!");
+                return;
+            }
+            if (pin.length() < 4) {
+                tvError.setText("PIN minimal 4 karakter / angka!");
+                return;
+            }
+            if (!pin.equals(confirm)) {
+                tvError.setText("Konfirmasi PIN tidak cocok!");
+                return;
+            }
+
+            boolean saved = NativeKioskManager.nativeSetPin(pin);
+            if (saved) {
+                Toast.makeText(this, "PIN berhasil disimpan!", Toast.LENGTH_SHORT).show();
+                dialog.dismiss();
+            } else {
+                tvError.setText("Gagal menyimpan PIN secara aman.");
+            }
+        });
+
+        dialog.show();
+    }
+
+    private void updatePermissionsUI() {
+        boolean isAdmin = isAdminActive();
+        boolean isAccessibility = isAccessibilityServiceEnabled();
+        boolean isOverlay = canDrawOverlays();
+
+        if (isAdmin) {
+            tvStatusAdmin.setText("✓ Aktif");
+            tvStatusAdmin.setTextColor(Color.parseColor("#4CAF50"));
+            btnGrantAdmin.setVisibility(View.GONE);
+        } else {
+            tvStatusAdmin.setText("✗ Belum Aktif");
+            tvStatusAdmin.setTextColor(Color.parseColor("#F44336"));
+            btnGrantAdmin.setVisibility(View.VISIBLE);
+        }
+
+        if (isAccessibility) {
+            tvStatusAccessibility.setText("✓ Aktif");
+            tvStatusAccessibility.setTextColor(Color.parseColor("#4CAF50"));
+            btnGrantAccessibility.setVisibility(View.GONE);
+        } else {
+            tvStatusAccessibility.setText("✗ Belum Aktif");
+            tvStatusAccessibility.setTextColor(Color.parseColor("#F44336"));
+            btnGrantAccessibility.setVisibility(View.VISIBLE);
+        }
+
+        if (isOverlay) {
+            tvStatusOverlay.setText("✓ Aktif");
+            tvStatusOverlay.setTextColor(Color.parseColor("#4CAF50"));
+            btnGrantOverlay.setVisibility(View.GONE);
+        } else {
+            tvStatusOverlay.setText("✗ Belum Aktif");
+            tvStatusOverlay.setTextColor(Color.parseColor("#FF9800"));
+            btnGrantOverlay.setVisibility(View.VISIBLE);
+        }
+
+        btnStartKiosk.setEnabled(isAdmin && isAccessibility && selectedApp != null);
+    }
+
+    private boolean isAdminActive() {
+        return devicePolicyManager != null && devicePolicyManager.isAdminActive(adminComponent);
+    }
+
+    private boolean isAccessibilityServiceEnabled() {
+        AccessibilityManager am = (AccessibilityManager) getSystemService(Context.ACCESSIBILITY_SERVICE);
+        if (am == null) return false;
+        List<AccessibilityServiceInfo> services = am.getEnabledAccessibilityServiceList(AccessibilityServiceInfo.FEEDBACK_ALL_MASK);
+        for (AccessibilityServiceInfo info : services) {
+            if (info.getId() != null && info.getId().contains(KioskAccessibilityService.class.getSimpleName())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean canDrawOverlays() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            return Settings.canDrawOverlays(this);
+        }
+        return true;
+    }
+
+    private void requestDeviceAdmin() {
+        Intent intent = new Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN);
+        intent.putExtra(DevicePolicyManager.EXTRA_DEVICE_ADMIN, adminComponent);
+        intent.putExtra(DevicePolicyManager.EXTRA_ADD_EXPLANATION,
+                "Device Admin diperlukan untuk mengamankan dan mengunci Kiosk Mode App Blocker.");
+        startActivity(intent);
+    }
+
+    private void requestAccessibility() {
+        Intent intent = new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS);
+        startActivity(intent);
+        Toast.makeText(this, "Aktifkan 'App Blocker Kiosk Service'", Toast.LENGTH_LONG).show();
+    }
+
+    private void requestOverlay() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    Uri.parse("package:" + getPackageName()));
+            startActivity(intent);
+        }
+    }
+
+    private void loadInstalledApps() {
+        progressBar.setVisibility(View.VISIBLE);
+        new Thread(() -> {
+            PackageManager pm = getPackageManager();
+            Intent intent = new Intent(Intent.ACTION_MAIN, null);
+            intent.addCategory(Intent.CATEGORY_LAUNCHER);
+
+            List<ResolveInfo> resolveInfos = pm.queryIntentActivities(intent, 0);
+            List<AppInfo> apps = new ArrayList<>();
+            String myPackage = getPackageName();
+
+            for (ResolveInfo ri : resolveInfos) {
+                if (ri.activityInfo != null) {
+                    String pkg = ri.activityInfo.packageName;
+                    if (!pkg.equals(myPackage)) {
+                        String name = ri.loadLabel(pm).toString();
+                        apps.add(new AppInfo(name, pkg, ri.loadIcon(pm)));
+                    }
+                }
+            }
+
+            Collections.sort(apps, (a, b) -> a.getAppName().compareToIgnoreCase(b.getAppName()));
+
+            runOnUiThread(() -> {
+                progressBar.setVisibility(View.GONE);
+                appAdapter = new AppAdapter(apps, this);
+                rvApps.setAdapter(appAdapter);
+            });
+        }).start();
+    }
+
+    @Override
+    public void onAppSelected(AppInfo appInfo) {
+        this.selectedApp = appInfo;
+        updatePermissionsUI();
+    }
+
+    private void startKioskMode() {
+        if (!NativeKioskManager.nativeHasPin()) {
+            Toast.makeText(this, "Harap buat PIN terlebih dahulu!", Toast.LENGTH_SHORT).show();
+            showSetPinDialog(false);
+            return;
+        }
+
+        if (!isAdminActive()) {
+            Toast.makeText(this, "Harap aktifkan izin Device Admin!", Toast.LENGTH_SHORT).show();
+            requestDeviceAdmin();
+            return;
+        }
+
+        if (!isAccessibilityServiceEnabled()) {
+            Toast.makeText(this, "Harap aktifkan izin Aksesibilitas!", Toast.LENGTH_SHORT).show();
+            requestAccessibility();
+            return;
+        }
+
+        if (selectedApp == null) {
+            Toast.makeText(this, "Pilih aplikasi yang ingin dikunci!", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        // Native C++ activates kiosk lock
+        boolean started = NativeKioskManager.nativeStartKiosk(selectedApp.getPackageName());
+        if (!started) {
+            Toast.makeText(this, "Gagal mengaktifkan Kiosk Mode secara native.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        // Start floating exit button & foreground service
+        Intent floatingIntent = new Intent(this, FloatingExitService.class);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(floatingIntent);
+        } else {
+            startService(floatingIntent);
+        }
+
+        // Launch the selected kiosk app
+        Intent launchIntent = getPackageManager().getLaunchIntentForPackage(selectedApp.getPackageName());
+        if (launchIntent != null) {
+            launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+            startActivity(launchIntent);
+        }
+
+        Toast.makeText(this, "Kiosk Mode aktif untuk " + selectedApp.getAppName(), Toast.LENGTH_LONG).show();
+    }
+}
