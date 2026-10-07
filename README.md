@@ -4,30 +4,37 @@ Turn any Android device into a simple, focused Kiosk.
 
 App Blocker adalah aplikasi Android yang memungkinkan kamu mengunci perangkat ke satu aplikasi pilihan menggunakan Kiosk Mode.
 
-Cocok untuk tablet kasir, perangkat sekolah, digital signage, perangkat operasional, testing device, atau perangkat apa pun yang perlu membatasi akses pengguna ke aplikasi tertentu.
+Cocok untuk:
+
+- 📱 Tablet kasir
+- 🏫 Perangkat sekolah
+- 🏭 Perangkat operasional
+- 🖥️ Digital signage
+- 🧪 Perangkat testing
+- 🔐 Perangkat bersama yang perlu dibatasi aksesnya
 
 «🛡️ One device. One app. Full focus.»
 
 ---
 
-✨ Highlights
+✨ Features
 
-Fitur| Deskripsi
+Feature| Description
 🔒 Kiosk Mode| Mengunci perangkat agar tetap berada di aplikasi yang dipilih
-📱 App Selector| Pilih aplikasi target langsung dari daftar aplikasi yang terinstal
+📱 App Selector| Memilih aplikasi target dari aplikasi yang terinstal
 🔑 PIN Protection| PIN diperlukan untuk keluar dari Kiosk Mode
-♿ Accessibility Protection| Mendeteksi perpindahan aplikasi dan mencoba mengembalikan fokus ke aplikasi Kiosk
+♿ Accessibility Protection| Mendeteksi perpindahan aplikasi saat Kiosk aktif
 🛡️ Device Admin| Menambahkan lapisan perlindungan administratif
 🫧 Floating Exit Button| Tombol melayang untuk membuka menu keluar
-⚙️ Native C++ Core| Core security dan kiosk logic menggunakan C++17 + Android NDK
-🔐 Salted SHA-256| PIN disimpan dalam bentuk hash dengan salt
+⚙️ Native C++ Core| Core logic menggunakan C++17 dan Android NDK
+🔐 Salted SHA-256| PIN diproses menggunakan salted SHA-256
 🤖 GitHub Actions| Build APK otomatis melalui CI
 
 ---
 
-🎯 Cara Kerjanya
+🎯 How It Works
 
-Konsep App Blocker sebenarnya cukup sederhana:
+Secara sederhana, alurnya seperti ini:
 
 ┌──────────────────────┐
 │     App Blocker      │
@@ -41,20 +48,18 @@ Konsep App Blocker sebenarnya cukup sederhana:
 ┌──────────────────────┐
 │     Kiosk Mode 🔒    │
 │                      │
-│   ┌──────────────┐   │
-│   │ Target App   │   │
-│   │              │   │
-│   │   Running    │   │
-│   │              │   │
-│   └──────────────┘   │
+│    ┌────────────┐    │
+│    │ Target App │    │
+│    │   Running  │    │
+│    └────────────┘    │
 └──────────┬───────────┘
            │
            │ User mencoba
-           │ keluar / pindah app
+           │ berpindah aplikasi
            ▼
 ┌──────────────────────┐
 │ Accessibility Service│
-│     detects it       │
+│      detects it      │
 └──────────┬───────────┘
            │
            ▼
@@ -62,134 +67,7 @@ Konsep App Blocker sebenarnya cukup sederhana:
 │ Kembali ke Target App│
 └──────────────────────┘
 
-             🚪
-        Exit Kiosk
-             │
-             ▼
-       ┌───────────┐
-       │ Enter PIN │
-       └─────┬─────┘
-             │
-       ┌─────▼─────┐
-       │ Valid PIN?│
-       └──┬─────┬──┘
-          YES    NO
-           │      │
-           ▼      ▼
-         Exit   Stay 🔒
-
----
-
-🚀 Quick Start
-
-1. Clone Repository
-
-git clone <your-repository-url>
-cd app-blocker
-
-2. Build Project
-
-Project menggunakan Android NDK + CMake, jadi pastikan environment Android development kamu sudah tersedia.
-
-Struktur native module berada di:
-
-app/src/main/cpp/
-
-Kemudian lakukan build menggunakan Android Studio atau Gradle.
-
----
-
-🤖 Build Otomatis dengan GitHub Actions
-
-Kalau kamu tidak ingin build APK secara manual, project ini juga menyediakan workflow GitHub Actions.
-
-Yang kamu butuhkan:
-
-- Git
-- GitHub account
-- GitHub CLI ("gh")
-
-Cek GitHub CLI:
-
-gh --version
-
-Login jika belum:
-
-gh auth login
-
----
-
-📦 Push Project ke GitHub
-
-Dari folder project:
-
-git init
-git branch -M main
-git add .
-git commit -m "feat: initial commit for App Blocker"
-
-Buat repository sekaligus push:
-
-gh repo create app-blocker --public --source=. --remote=origin --push
-
-GitHub Actions kemudian akan menjalankan workflow:
-
-.github/workflows/build.yml
-
----
-
-👀 Monitor Build
-
-Lihat daftar workflow:
-
-gh run list --workflow=build.yml
-
-Pantau build secara langsung:
-
-gh run watch
-
-Jika build berhasil, kamu akan mendapatkan artifact APK.
-
----
-
-📥 Download APK
-
-Download artifact:
-
-gh run download -n AppBlocker-debug-apk
-
-APK kemudian siap dipindahkan dan diinstal ke perangkat Android.
-
----
-
-📱 Setup Kiosk Mode
-
-Setelah APK terpasang, ikuti alur berikut:
-
-Install APK
-     │
-     ▼
-Open App Blocker
-     │
-     ▼
-Create Security PIN
-     │
-     ▼
-Grant Required Permissions
-     │
-     ▼
-Select Target Application
-     │
-     ▼
-Enable Kiosk Mode
-     │
-     ▼
-      🔒
-   KIOSK ACTIVE
-
-Ketika Kiosk Mode aktif, App Blocker akan mencoba memastikan perangkat tetap berada di aplikasi target.
-
-Untuk keluar:
+Untuk keluar dari Kiosk Mode:
 
 Tap Floating Exit Button
           │
@@ -202,6 +80,137 @@ Tap Floating Exit Button
      │         │
      ▼         ▼
    Exit     Stay Locked 🔒
+
+---
+
+🚀 Quick Start
+
+1. Clone Repository
+
+git clone <your-repository-url>
+cd app-blocker
+
+2. Open with Android Studio
+
+Buka folder project menggunakan Android Studio.
+
+Pastikan environment berikut tersedia:
+
+- Android SDK
+- Android NDK
+- CMake
+- JDK yang sesuai dengan konfigurasi Gradle project
+
+Native C++ source berada di:
+
+app/src/main/cpp/
+
+---
+
+🤖 Build with GitHub Actions
+
+Project ini sudah dilengkapi dengan GitHub Actions untuk melakukan build APK secara otomatis.
+
+Requirements
+
+Pastikan kamu sudah memiliki:
+
+- Git
+- GitHub account
+- GitHub CLI ("gh")
+
+Cek GitHub CLI:
+
+gh --version
+
+Jika belum login:
+
+gh auth login
+
+---
+
+1. Push Project ke GitHub
+
+Dari folder project:
+
+git init
+git branch -M main
+git add .
+git commit -m "feat: initial commit for App Blocker"
+
+Kemudian buat repository dan push:
+
+gh repo create app-blocker --public --source=. --remote=origin --push
+
+GitHub Actions akan menjalankan workflow:
+
+.github/workflows/build.yml
+
+---
+
+2. Monitor Build
+
+Lihat daftar workflow:
+
+gh run list --workflow=build.yml
+
+Untuk mengikuti proses build secara langsung:
+
+gh run watch
+
+Tunggu sampai workflow selesai dengan status success ✅.
+
+---
+
+3. Download APK
+
+Setelah build berhasil:
+
+gh run download -n AppBlocker-debug-apk
+
+APK hasil build akan tersedia di folder hasil download.
+
+---
+
+📱 Setup Kiosk Mode
+
+Setelah APK terpasang, ikuti langkah berikut:
+
+Install APK
+    │
+    ▼
+Open App Blocker
+    │
+    ▼
+Create Security PIN
+    │
+    ▼
+Grant Required Permissions
+    │
+    ▼
+Select Target Application
+    │
+    ▼
+Enable Kiosk Mode
+    │
+    ▼
+🔒 KIOSK ACTIVE
+
+Saat Kiosk Mode aktif, App Blocker akan mencoba memastikan perangkat tetap berada di aplikasi target.
+
+Untuk keluar:
+
+Floating Exit Button
+        │
+        ▼
+     Enter PIN
+        │
+   ┌────┴────┐
+   ▼         ▼
+ Correct   Incorrect
+   │         │
+   ▼         ▼
+ Exit      Stay Locked 🔒
 
 ---
 
@@ -225,7 +234,7 @@ Component:
 
 AccessibilityService
 
-Digunakan untuk mendeteksi perubahan aplikasi/window yang sedang aktif.
+Digunakan untuk mendeteksi aplikasi atau window yang sedang aktif.
 
 Ketika Kiosk Mode aktif, service ini membantu mencegah pengguna berpindah ke aplikasi yang tidak diizinkan.
 
@@ -237,33 +246,36 @@ Permission:
 
 SYSTEM_ALERT_WINDOW
 
-Diperlukan untuk menampilkan floating exit button dan elemen UI tertentu di atas aplikasi target.
+Digunakan untuk menampilkan floating exit button dan elemen UI tertentu di atas aplikasi target.
 
 ---
 
-🧠 Security
+🧠 Security Architecture
 
-App Blocker menggunakan native module untuk menangani beberapa bagian dari core logic.
+App Blocker menggunakan native C++ module untuk menangani beberapa bagian dari core logic.
 
-Java / Android
-      │
-      │ JNI
-      ▼
-┌─────────────────────┐
-│     Native C++     │
-│                     │
-│  Kiosk State        │
-│  App Whitelist      │
-│  PIN Verification   │
-│  SHA-256 Hashing    │
-│                     │
-└─────────────────────┘
+┌─────────────────────────┐
+│     Android / Java      │
+│                         │
+│  UI / Services / Apps   │
+└────────────┬────────────┘
+             │
+             │ JNI
+             ▼
+┌─────────────────────────┐
+│       Native C++        │
+│                         │
+│  Kiosk State            │
+│  App Whitelist          │
+│  PIN Verification       │
+│  SHA-256 Hashing        │
+└─────────────────────────┘
 
 🔑 PIN Hashing
 
-PIN tidak digunakan sebagai plaintext untuk proses validasi.
+PIN tidak disimpan sebagai plaintext.
 
-Konsep sederhananya:
+Secara sederhana:
 
 PIN
  │
@@ -275,7 +287,7 @@ SHA-256
  ▼
 Stored Hash
 
-Native security module ditulis menggunakan:
+Native security module menggunakan:
 
 - C++17
 - Android NDK
@@ -283,7 +295,7 @@ Native security module ditulis menggunakan:
 - JNI
 - SHA-256
 
-«⚠️ Hashing bukan berarti PIN bisa dipulihkan kembali. Pastikan PIN tetap disimpan dengan aman dan jangan membagikannya kepada pengguna yang tidak berwenang.»
+«⚠️ Hashing bukan berarti PIN dapat dipulihkan kembali. Pastikan PIN tetap diingat dan jangan membagikannya kepada orang yang tidak berwenang.»
 
 ---
 
@@ -294,61 +306,63 @@ App Blocker/
 ├── .github/
 │   └── workflows/
 │       └── build.yml
-│           └── GitHub Actions CI
+│           # GitHub Actions CI
 │
 ├── app/
 │   │
 │   ├── CMakeLists.txt
-│   │   └── NDK / CMake configuration
+│   │   # NDK / CMake configuration
 │   │
 │   ├── build.gradle
+│   │   # Android module configuration
 │   │
 │   └── src/main/
 │       │
 │       ├── cpp/
-│       │   │
+│       │   # Native C++ source
+│       │
 │       │   ├── sha256.hpp
 │       │   ├── sha256.cpp
-│       │   │   └── SHA-256 implementation
+│       │   │   # SHA-256 implementation
 │       │   │
 │       │   ├── kiosk_core.hpp
 │       │   ├── kiosk_core.cpp
-│       │   │   └── Kiosk state & whitelist logic
+│       │   │   # Kiosk state & whitelist logic
 │       │   │
 │       │   └── app_blocker.cpp
-│       │       └── JNI bridge
+│       │       # JNI bridge
 │       │
 │       ├── java/com/appblocker/kiosk/
 │       │   │
 │       │   ├── MainActivity.java
-│       │   │   └── Main screen & settings
+│       │   │   # Main screen & settings
 │       │   │
 │       │   ├── UnlockActivity.java
-│       │   │   └── PIN unlock screen
+│       │   │   # PIN unlock screen
 │       │   │
 │       │   ├── NativeKioskManager.java
-│       │   │   └── Java ↔ C++ interface
+│       │   │   # Java ↔ C++ interface
 │       │   │
 │       │   ├── KioskAccessibilityService.java
-│       │   │   └── Accessibility monitoring
+│       │   │   # Accessibility monitoring
 │       │   │
 │       │   ├── KioskDeviceAdminReceiver.java
-│       │   │   └── Device Admin receiver
+│       │   │   # Device Admin receiver
 │       │   │
 │       │   ├── FloatingExitService.java
-│       │   │   └── Floating exit button
+│       │   │   # Floating exit button
 │       │   │
 │       │   ├── AppInfo.java
-│       │   │   └── Application model
+│       │   │   # Application model
 │       │   │
 │       │   └── AppAdapter.java
-│       │       └── Application list adapter
+│       │       # Application list adapter
 │       │
 │       └── res/
-│           └── Android resources
+│           # Android resources
 │
 └── build.gradle
-    └── Root project configuration
+    # Root project configuration
 
 ---
 
@@ -368,6 +382,65 @@ Technology| Purpose
 
 ---
 
+🧪 Development
+
+Untuk development, kamu bisa menggunakan Android Studio dengan Android SDK, NDK, dan CMake yang sesuai dengan konfigurasi project.
+
+Android Layer
+
+Source Android berada di:
+
+app/src/main/java/com/appblocker/kiosk/
+
+Native Layer
+
+Source C++ berada di:
+
+app/src/main/cpp/
+
+Core Kiosk logic:
+
+kiosk_core.hpp
+kiosk_core.cpp
+
+JNI bridge:
+
+app_blocker.cpp
+NativeKioskManager.java
+
+---
+
+🐛 Troubleshooting
+
+Kiosk Mode tidak mengunci aplikasi
+
+Coba periksa:
+
+- Accessibility Service sudah aktif.
+- Semua permission yang diperlukan sudah diberikan.
+- Aplikasi target masih terinstal.
+- Tidak ada policy OEM yang membatasi Accessibility Service.
+
+---
+
+Floating Button tidak muncul
+
+Pastikan permission:
+
+Display over other apps
+
+sudah diaktifkan untuk App Blocker.
+
+---
+
+Tidak bisa keluar dari Kiosk Mode
+
+Pastikan PIN yang dimasukkan benar.
+
+Jika sedang melakukan development atau testing, jangan mengaktifkan Kiosk Mode pada perangkat utama sebelum memastikan mekanisme exit sudah bekerja dengan baik.
+
+---
+
 ⚠️ Important Notes
 
 App Blocker menggunakan permission Android yang cukup kuat, terutama:
@@ -378,7 +451,7 @@ App Blocker menggunakan permission Android yang cukup kuat, terutama:
 
 Gunakan aplikasi ini hanya pada perangkat yang memang kamu miliki atau memiliki izin untuk mengelolanya.
 
-Sebelum digunakan pada perangkat produksi, sangat disarankan untuk melakukan testing terlebih dahulu.
+Sangat disarankan untuk melakukan testing terlebih dahulu sebelum digunakan pada perangkat produksi.
 
 Android Compatibility
 
@@ -390,62 +463,7 @@ Perilaku Kiosk Mode dapat berbeda tergantung:
 - Implementasi Accessibility Service
 - Device management policy
 
-Dengan kata lain, hasil pada satu perangkat belum tentu identik dengan perangkat lainnya.
-
----
-
-🧪 Development
-
-Untuk melakukan development, kamu dapat menggunakan Android Studio dengan Android SDK, NDK, dan CMake yang sesuai dengan konfigurasi project.
-
-Bagian native berada di:
-
-app/src/main/cpp/
-
-Sedangkan Android application layer berada di:
-
-app/src/main/java/com/appblocker/kiosk/
-
-Jika ingin mengubah logika Kiosk, bagian utama yang perlu diperhatikan adalah:
-
-kiosk_core.cpp
-kiosk_core.hpp
-
-Jika ingin mengubah komunikasi antara Java dan native layer:
-
-app_blocker.cpp
-NativeKioskManager.java
-
----
-
-🐛 Troubleshooting
-
-Kiosk Mode tidak mengunci aplikasi
-
-Pastikan:
-
-- Accessibility Service sudah aktif.
-- Permission yang diperlukan sudah diberikan.
-- Aplikasi target masih terinstal.
-- Perangkat tidak memiliki policy OEM yang mengganggu Accessibility Service.
-
----
-
-Floating button tidak muncul
-
-Periksa permission:
-
-Display over other apps
-
-Pastikan App Blocker diizinkan untuk menampilkan overlay.
-
----
-
-Tidak bisa keluar dari Kiosk Mode
-
-Pastikan kamu menggunakan PIN yang benar.
-
-Jika sedang melakukan development/testing, jangan mengaktifkan Kiosk Mode pada perangkat utama sebelum memastikan mekanisme exit sudah bekerja dengan baik.
+Jadi, hasil pada satu perangkat belum tentu sama dengan perangkat lainnya.
 
 ---
 
@@ -453,18 +471,23 @@ Jika sedang melakukan development/testing, jangan mengaktifkan Kiosk Mode pada p
 
 Pull Request, bug report, dan improvement sangat dipersilakan! ❤️
 
-Kalau menemukan bug:
+Reporting a Bug
 
-1. Cek apakah issue tersebut sudah pernah dilaporkan.
-2. Buat issue baru jika belum ada.
-3. Sertakan versi Android dan informasi perangkat jika memungkinkan.
-4. Jelaskan langkah untuk mereproduksi masalah.
+Sebelum membuat issue:
 
-Untuk kontribusi kode:
+1. Pastikan issue tersebut belum pernah dilaporkan.
+2. Gunakan versi aplikasi terbaru.
+3. Sertakan versi Android.
+4. Sertakan informasi perangkat jika memungkinkan.
+5. Jelaskan langkah untuk mereproduksi masalah.
+
+Creating a Pull Request
+
+Buat branch baru:
 
 git checkout -b feature/my-feature
 
-Lakukan perubahan, kemudian buat Pull Request.
+Lakukan perubahan, commit, kemudian buat Pull Request.
 
 ---
 
@@ -474,7 +497,7 @@ App Blocker dirilis di bawah:
 
 GNU General Public License v3.0
 
-GPL-3.0
+GPL-3.0-only
 
 Kamu bebas untuk:
 
@@ -484,7 +507,7 @@ Kamu bebas untuk:
 - ✅ Membagikan software
 - ✅ Membagikan versi yang telah dimodifikasi
 
-Dengan syarat distribusi tetap mengikuti ketentuan GNU GPL v3.0, termasuk kewajiban terkait source code dan lisensi.
+Distribusi versi yang dimodifikasi tetap harus mengikuti ketentuan GNU GPL v3.0, termasuk persyaratan terkait source code dan lisensi.
 
 Lihat file ""LICENSE"" (LICENSE) untuk teks lengkap lisensi.
 
@@ -496,7 +519,7 @@ SPDX-License-Identifier: "GPL-3.0-only"
 
 Kalau project ini berguna buat kamu, jangan lupa kasih ⭐ Star di GitHub!
 
-Star kecil dari kamu membantu project ini lebih mudah ditemukan oleh developer lain. ❤️
+Star dari kamu membantu project ini lebih mudah ditemukan oleh developer lain. ❤️
 
 ---
 
@@ -506,6 +529,6 @@ Simple Kiosk Mode for Android
 
 Made with ☕ Java + ⚙️ C++ + ❤️
 
-GPL-3.0
+Licensed under GPL-3.0-only
 
 </div>
