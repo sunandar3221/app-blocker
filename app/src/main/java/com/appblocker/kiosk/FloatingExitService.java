@@ -60,6 +60,7 @@ public class FloatingExitService extends Service {
             stopSelf();
             return START_NOT_STICKY;
         }
+        setupFloatingView();
         return START_STICKY;
     }
 
@@ -123,6 +124,10 @@ public class FloatingExitService extends Service {
         }
 
         try {
+            if (floatingView != null) {
+                Log.d(TAG, "Floating view already exists, skipping duplicate addition.");
+                return;
+            }
             windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
             if (windowManager == null) return;
 

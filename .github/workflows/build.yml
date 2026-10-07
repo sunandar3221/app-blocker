@@ -76,37 +76,38 @@ jobs:
         run: |
           RAW_APK=$(find app/build/outputs/apk/debug -name "*.apk" | head -n 1)
           echo "Raw APK: $RAW_APK"
-          cp "$RAW_APK" AppBlocker-v2.0.2.apk
+          cp "$RAW_APK" AppBlocker-v2.0.3.apk
           cp "$RAW_APK" AppBlocker.apk
-          echo "apk_path=AppBlocker-v2.0.2.apk" >> $GITHUB_OUTPUT
+          echo "apk_path=AppBlocker-v2.0.3.apk" >> $GITHUB_OUTPUT
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: AppBlocker-v2.0.2-apk
-          path: AppBlocker-v2.0.2.apk
+          name: AppBlocker-v2.0.3-apk
+          path: AppBlocker-v2.0.3.apk
           retention-days: 14
 
       - name: Publish to GitHub Releases
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v2.0.2
-          name: "App Blocker v2.0.2 (Conflict-Free Signing & Auto-Resume Installer)"
+          tag_name: v2.0.3
+          name: "App Blocker v2.0.3 (Watchdog Protection & Stable Boot Kiosk)"
           body: |
-            ### 🚀 App Blocker v2.0.2 (Pembaruan Tanpa Bentrok)
+            ### 🚀 App Blocker v2.0.3 (Perbaikan Boot Kiosk & Aksesibilitas)
 
-            Rilis dengan sertifikat penandatangan (keystore) tetap dan perbaikan alur instalasi izin.
+            Pembaruan kritis untuk stabilitas boot restart HP dan pencegahan izin aksesibilitas mati sendiri oleh sistem Android.
 
-            **Pembaruan v2.0.2:**
-            - 🔑 **Kunci Sertifikat Tetap (Zero Package Conflict):** Menjamin setiap pembaruan ditandatangani oleh sertifikat keystore yang identik, menghilangkan error *'paket bentrok dengan paket yang sudah ada'*.
-            - 📲 **Auto-Resume Installer:** Saat Anda mengaktifkan izin *'Izinkan dari sumber ini'* di Pengaturan Android dan menekan tombol Kembali, layar penginstal paket otomatis langsung muncul kembali di depan layar tanpa hilang!
-            - 🔄 **Smart Boot Persistence:** Deteksi restart HP tetap aktif dan andal mengunci Kiosk mode.
+            **Pembaruan v2.0.3:**
+            - 🛡️ **Anti-Crash & Anti-Watchdog Disabling:** Menghilangkan looping restart activity (`FLAG_ACTIVITY_CLEAR_TOP`) yang menyebabkan sistem Android mendeteksi ANR/thrashing dan mematikan izin aksesibilitas.
+            - 🔄 **Stabilitas Kiosk Pasca Restart (Reboot Persistence):** Memperbaiki handling jendela dan overlay bubble agar tetap menyala stabil tanpa pop-up hilang atau tertutup sendiri saat HP selesai menyala.
+            - 🔑 **Conflict-Free Signing:** Ditandatangani otomatis dengan sertifikat konsisten sehingga pembaruan in-app via GitHub Releases berjalan lancar tanpa bentrok.
+            - 📲 **Auto-Resume Installer:** Menu install tetap lanjut otomatis setelah mengaktifkan izin sumber tidak dikenal.
 
             **Unduh APK:**
-            Unduh file **AppBlocker-v2.0.2.apk** di bawah.
+            Unduh file **AppBlocker-v2.0.3.apk** di bawah.
           files: |
-            AppBlocker-v2.0.2.apk
+            AppBlocker-v2.0.3.apk
             AppBlocker.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

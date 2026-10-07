@@ -25,6 +25,7 @@ public class KioskAccessibilityService extends AccessibilityService {
     private final Handler handler = new Handler(Looper.getMainLooper());
     private long lastWarningTime = 0;
     private long lastRedirectTime = 0;
+    private long lastBootResumeTime = 0;
     private final Set<String> launcherPackages = new HashSet<>();
     private BroadcastReceiver screenReceiver;
 
@@ -37,7 +38,7 @@ public class KioskAccessibilityService extends AccessibilityService {
             registerScreenReceiver();
             Log.d(TAG, "Kiosk Accessibility Service connected.");
 
-            // Crucial: If phone was rebooted while Kiosk was active, resume immediately!
+            // If phone was rebooted while Kiosk was active, resume gently!
             if (NativeKioskManager.nativeIsKioskActive()) {
                 Log.w(TAG, "Kiosk mode is ACTIVE upon service connection. Resuming kiosk enforcement...");
                 resumeKioskOnBoot("service_connected");
@@ -58,7 +59,7 @@ public class KioskAccessibilityService extends AccessibilityService {
                     if (Intent.ACTION_USER_PRESENT.equals(action) || Intent.ACTION_SCREEN_ON.equals(action)) {
                         NativeKioskManager.init(getApplicationContext());
                         if (NativeKioskManager.nativeIsKioskActive()) {
-                            Log.d(TAG, "Screen unlocked / ON after boot while kiosk active. Enforcing kiosk.");
+                            Log.d(TAG, "Screen unlocked / ON while kiosk active. Resuming kiosk gently.");
                             resumeKioskOnBoot(action);
                         }
                     }
@@ -67,13 +68,24 @@ public class KioskAccessibilityService extends AccessibilityService {
             IntentFilter filter = new IntentFilter();
             filter.addAction(Intent.ACTION_USER_PRESENT);
             filter.addAction(Intent.ACTION_SCREEN_ON);
-            registerReceiver(screenReceiver, filter);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                registerReceiver(screenReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
+            } else {
+                registerReceiver(screenReceiver, filter);
+            }
         } catch (Throwable t) {
             Log.e(TAG, "Error registering screenReceiver", t);
         }
     }
 
     private void resumeKioskOnBoot(String reason) {
+        long now = System.currentTimeMillis();
+        // Prevent duplicate rapid resume calls within 4 seconds
+        if (now - lastBootResumeTime < 4000) {
+            return;
+        }
+        lastBootResumeTime = now;
+
         // 1. Ensure FloatingExitService is running
         try {
             Intent serviceIntent = new Intent(this, FloatingExitService.class);
@@ -86,9 +98,25 @@ public class KioskAccessibilityService extends AccessibilityService {
             Log.e(TAG, "Error starting FloatingExitService on boot resume", t);
         }
 
-        // 2. Force target kiosk application to front with safe delayed retries
-        handler.postDelayed(() -> blockAndRedirect("boot_resume_" + reason), 200);
-        handler.postDelayed(() -> blockAndRedirect("boot_retry_" + reason), 1000);
+        // 2. Launch target application without crashing or destroying running task
+        String targetPackage = NativeKioskManager.nativeGetTargetPackage();
+        if (targetPackage != null && !targetPackage.isEmpty()) {
+            handler.postDelayed(() -> {
+                try {
+                    Intent launchIntent = getPackageManager().getLaunchIntentForPackage(targetPackage);
+                    if (launchIntent != null) {
+                        launchIntent.addFlags(
+                                Intent.FLAG_ACTIVITY_NEW_TASK |
+                                Intent.FLAG_ACTIVITY_REORDER_TO_FRONT |
+                                Intent.FLAG_ACTIVITY_SINGLE_TOP
+                        );
+                        startActivity(launchIntent);
+                    }
+                } catch (Throwable e) {
+                    Log.e(TAG, "Error launching target on boot resume: " + e.getMessage());
+                }
+            }, 800);
+        }
     }
 
     private void loadLauncherPackages() {
@@ -96,7 +124,6 @@ public class KioskAccessibilityService extends AccessibilityService {
             PackageManager pm = getPackageManager();
             Intent intent = new Intent(Intent.ACTION_MAIN);
             intent.addCategory(Intent.CATEGORY_HOME);
-            // Query with flag 0 to find ALL OEM launchers without omission
             List<ResolveInfo> resolveInfos = pm.queryIntentActivities(intent, 0);
             launcherPackages.clear();
             for (ResolveInfo ri : resolveInfos) {
@@ -149,6 +176,12 @@ public class KioskAccessibilityService extends AccessibilityService {
             if (packageNameChar == null) return;
             String packageName = packageNameChar.toString();
 
+            // 0. If current window is ALREADY the target app, do nothing!
+            String targetPackage = NativeKioskManager.nativeGetTargetPackage();
+            if (targetPackage != null && !targetPackage.isEmpty() && packageName.equals(targetPackage)) {
+                return;
+            }
+
             // 1. Allow our own app (UnlockActivity, Pin Dialogs, MainActivity)
             if (packageName.equals(getPackageName())) {
                 return;
@@ -163,17 +196,12 @@ public class KioskAccessibilityService extends AccessibilityService {
             if (packageName.equals("com.android.systemui")) {
                 CharSequence className = event.getClassName();
                 String cls = (className != null) ? className.toString().toLowerCase() : "";
-                // If user is pulling down notifications or opening recents panel
                 if (cls.contains("panel") || cls.contains("shade") || cls.contains("recents") || cls.contains("overview") || cls.contains("qs")) {
                     Log.w(TAG, "SystemUI notification/recents panel detected. Collapsing...");
                     performGlobalAction(GLOBAL_ACTION_BACK);
-                    try {
-                        sendBroadcast(new Intent(Intent.ACTION_CLOSE_SYSTEM_DIALOGS));
-                    } catch (Throwable ignored) {}
                     blockAndRedirect(packageName);
                     return;
                 }
-                // Allow standard status bar rendering when not opening panels
                 return;
             }
 
@@ -225,13 +253,13 @@ public class KioskAccessibilityService extends AccessibilityService {
 
     private synchronized void blockAndRedirect(String attemptedPackage) {
         long now = System.currentTimeMillis();
-        // Prevent rapid intent thrashing while maintaining instantaneous blocking
-        if (now - lastRedirectTime < 150) {
+        // Prevent rapid intent thrashing: cooldown minimum 600ms
+        if (now - lastRedirectTime < 600) {
             return;
         }
         lastRedirectTime = now;
 
-        if (now - lastWarningTime > 2500) {
+        if (now - lastWarningTime > 3000) {
             lastWarningTime = now;
             handler.post(() -> {
                 try {
@@ -244,11 +272,6 @@ public class KioskAccessibilityService extends AccessibilityService {
             });
         }
 
-        // Close any opened system dialogs or notification shades
-        try {
-            sendBroadcast(new Intent(Intent.ACTION_CLOSE_SYSTEM_DIALOGS));
-        } catch (Throwable ignored) {}
-
         String targetPackage = NativeKioskManager.nativeGetTargetPackage();
         if (targetPackage != null && !targetPackage.isEmpty() && !targetPackage.equals(attemptedPackage)) {
             try {
@@ -257,7 +280,7 @@ public class KioskAccessibilityService extends AccessibilityService {
                     launchIntent.addFlags(
                             Intent.FLAG_ACTIVITY_NEW_TASK |
                             Intent.FLAG_ACTIVITY_REORDER_TO_FRONT |
-                            Intent.FLAG_ACTIVITY_CLEAR_TOP
+                            Intent.FLAG_ACTIVITY_SINGLE_TOP
                     );
                     startActivity(launchIntent);
                 }
