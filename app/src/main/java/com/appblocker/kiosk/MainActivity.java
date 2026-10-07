@@ -83,6 +83,9 @@ public class MainActivity extends AppCompatActivity implements AppAdapter.OnAppS
         initViews();
         checkFirstTimePin();
         loadInstalledApps();
+
+        // Check for updates on startup
+        UpdateManager.checkForUpdates(this, false);
     }
 
     @Override
@@ -127,6 +130,11 @@ public class MainActivity extends AppCompatActivity implements AppAdapter.OnAppS
         Button btnOpenChangePin = findViewById(R.id.btnOpenChangePin);
         if (btnOpenChangePin != null) {
             btnOpenChangePin.setOnClickListener(v -> showChangePinDialog());
+        }
+
+        Button btnCheckUpdate = findViewById(R.id.btnCheckUpdate);
+        if (btnCheckUpdate != null) {
+            btnCheckUpdate.setOnClickListener(v -> UpdateManager.checkForUpdates(this, true));
         }
 
         etSearch.addTextChangedListener(new TextWatcher() {
