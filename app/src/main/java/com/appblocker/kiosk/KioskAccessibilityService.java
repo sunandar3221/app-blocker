@@ -1,10 +1,13 @@
 package com.appblocker.kiosk;
 
 import android.accessibilityservice.AccessibilityService;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
+import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
@@ -23,6 +26,7 @@ public class KioskAccessibilityService extends AccessibilityService {
     private long lastWarningTime = 0;
     private long lastRedirectTime = 0;
     private final Set<String> launcherPackages = new HashSet<>();
+    private BroadcastReceiver screenReceiver;
 
     @Override
     protected void onServiceConnected() {
@@ -30,10 +34,61 @@ public class KioskAccessibilityService extends AccessibilityService {
         try {
             NativeKioskManager.init(getApplicationContext());
             loadLauncherPackages();
+            registerScreenReceiver();
             Log.d(TAG, "Kiosk Accessibility Service connected.");
+
+            // Crucial: If phone was rebooted while Kiosk was active, resume immediately!
+            if (NativeKioskManager.nativeIsKioskActive()) {
+                Log.w(TAG, "Kiosk mode is ACTIVE upon service connection. Resuming kiosk enforcement...");
+                resumeKioskOnBoot("service_connected");
+            }
         } catch (Throwable t) {
             Log.e(TAG, "Error in onServiceConnected", t);
         }
+    }
+
+    private void registerScreenReceiver() {
+        if (screenReceiver != null) return;
+        try {
+            screenReceiver = new BroadcastReceiver() {
+                @Override
+                public void onReceive(Context context, Intent intent) {
+                    if (intent == null) return;
+                    String action = intent.getAction();
+                    if (Intent.ACTION_USER_PRESENT.equals(action) || Intent.ACTION_SCREEN_ON.equals(action)) {
+                        NativeKioskManager.init(getApplicationContext());
+                        if (NativeKioskManager.nativeIsKioskActive()) {
+                            Log.d(TAG, "Screen unlocked / ON after boot while kiosk active. Enforcing kiosk.");
+                            resumeKioskOnBoot(action);
+                        }
+                    }
+                }
+            };
+            IntentFilter filter = new IntentFilter();
+            filter.addAction(Intent.ACTION_USER_PRESENT);
+            filter.addAction(Intent.ACTION_SCREEN_ON);
+            registerReceiver(screenReceiver, filter);
+        } catch (Throwable t) {
+            Log.e(TAG, "Error registering screenReceiver", t);
+        }
+    }
+
+    private void resumeKioskOnBoot(String reason) {
+        // 1. Ensure FloatingExitService is running
+        try {
+            Intent serviceIntent = new Intent(this, FloatingExitService.class);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(serviceIntent);
+            } else {
+                startService(serviceIntent);
+            }
+        } catch (Throwable t) {
+            Log.e(TAG, "Error starting FloatingExitService on boot resume", t);
+        }
+
+        // 2. Force target kiosk application to front with safe delayed retries
+        handler.postDelayed(() -> blockAndRedirect("boot_resume_" + reason), 200);
+        handler.postDelayed(() -> blockAndRedirect("boot_retry_" + reason), 1000);
     }
 
     private void loadLauncherPackages() {
@@ -41,10 +96,11 @@ public class KioskAccessibilityService extends AccessibilityService {
             PackageManager pm = getPackageManager();
             Intent intent = new Intent(Intent.ACTION_MAIN);
             intent.addCategory(Intent.CATEGORY_HOME);
-            List<ResolveInfo> resolveInfos = pm.queryIntentActivities(intent, PackageManager.MATCH_DEFAULT_ONLY);
+            // Query with flag 0 to find ALL OEM launchers without omission
+            List<ResolveInfo> resolveInfos = pm.queryIntentActivities(intent, 0);
             launcherPackages.clear();
             for (ResolveInfo ri : resolveInfos) {
-                if (ri.activityInfo != null) {
+                if (ri.activityInfo != null && ri.activityInfo.packageName != null) {
                     launcherPackages.add(ri.activityInfo.packageName);
                 }
             }
@@ -181,7 +237,7 @@ public class KioskAccessibilityService extends AccessibilityService {
                 try {
                     Toast.makeText(
                             getApplicationContext(),
-                            "Kiosk Mode Aktif! Akses diblokir. Masukkan PIN untuk keluar.",
+                            "Kiosk Mode Aktif! Masukkan PIN untuk keluar.",
                             Toast.LENGTH_SHORT
                     ).show();
                 } catch (Throwable ignored) {}
@@ -208,6 +264,17 @@ public class KioskAccessibilityService extends AccessibilityService {
             } catch (Throwable e) {
                 Log.e(TAG, "Error redirecting to target kiosk app: " + e.getMessage());
             }
+        }
+    }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        if (screenReceiver != null) {
+            try {
+                unregisterReceiver(screenReceiver);
+                screenReceiver = null;
+            } catch (Throwable ignored) {}
         }
     }
 

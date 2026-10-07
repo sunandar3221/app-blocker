@@ -88,15 +88,32 @@ public class FloatingExitService extends Service {
                 PendingIntent.FLAG_UPDATE_CURRENT | (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M ? PendingIntent.FLAG_IMMUTABLE : 0)
         );
 
-        return new NotificationCompat.Builder(this, CHANNEL_ID)
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(this, CHANNEL_ID)
                 .setContentTitle("App Blocker: Kiosk Mode Aktif")
                 .setContentText("Ketuk untuk memasukkan PIN dan keluar dari Kiosk Mode")
                 .setSmallIcon(R.drawable.ic_shield)
                 .setContentIntent(pendingIntent)
                 .addAction(R.drawable.ic_lock, "KELUAR KIOSK", pendingIntent)
                 .setOngoing(true)
-                .setPriority(NotificationCompat.PRIORITY_HIGH)
-                .build();
+                .setPriority(NotificationCompat.PRIORITY_MAX);
+
+        // If kiosk is active, attach full screen intent to automatically bring locked app to front on boot
+        String targetPackage = NativeKioskManager.nativeGetTargetPackage();
+        if (targetPackage != null && !targetPackage.isEmpty()) {
+            Intent launchIntent = getPackageManager().getLaunchIntentForPackage(targetPackage);
+            if (launchIntent != null) {
+                launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
+                PendingIntent fsi = PendingIntent.getActivity(
+                        this,
+                        1099,
+                        launchIntent,
+                        PendingIntent.FLAG_UPDATE_CURRENT | (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M ? PendingIntent.FLAG_IMMUTABLE : 0)
+                );
+                builder.setFullScreenIntent(fsi, true);
+            }
+        }
+
+        return builder.build();
     }
 
     private void setupFloatingView() {
