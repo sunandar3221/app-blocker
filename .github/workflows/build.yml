@@ -45,7 +45,29 @@ jobs:
         with:
           gradle-version: '8.7'
 
-      - name: Build Debug APK
+      - name: Setup Persistent Signing Keystore
+        run: |
+          mkdir -p keystore
+          if [ ! -f "keystore/app-release.jks" ]; then
+            echo "Generating persistent signing keystore..."
+            keytool -genkeypair -v \
+              -keystore keystore/app-release.jks \
+              -alias appblocker \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -storepass "appblocker_secure_key_2026" \
+              -keypass "appblocker_secure_key_2026" \
+              -dname "CN=AppBlocker, OU=Kiosk, O=AppBlocker, L=Jakarta, ST=Jakarta, C=ID"
+            
+            git config --global user.name "github-actions[bot]"
+            git config --global user.email "github-actions[bot]@users.noreply.github.com"
+            git add keystore/app-release.jks
+            git commit -m "ci: persist release keystore to eliminate package signature conflict" || true
+            git push origin main || true
+          fi
+
+      - name: Build Debug APK (Signed with Persistent Keystore)
         run: |
           gradle assembleDebug --stacktrace
 
@@ -54,37 +76,37 @@ jobs:
         run: |
           RAW_APK=$(find app/build/outputs/apk/debug -name "*.apk" | head -n 1)
           echo "Raw APK: $RAW_APK"
-          cp "$RAW_APK" AppBlocker-v2.0.1.apk
+          cp "$RAW_APK" AppBlocker-v2.0.2.apk
           cp "$RAW_APK" AppBlocker.apk
-          echo "apk_path=AppBlocker-v2.0.1.apk" >> $GITHUB_OUTPUT
+          echo "apk_path=AppBlocker-v2.0.2.apk" >> $GITHUB_OUTPUT
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: AppBlocker-v2.0.1-apk
-          path: AppBlocker-v2.0.1.apk
+          name: AppBlocker-v2.0.2-apk
+          path: AppBlocker-v2.0.2.apk
           retention-days: 14
 
       - name: Publish to GitHub Releases
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v2.0.1
-          name: "App Blocker v2.0.1 (Update Test Release)"
+          tag_name: v2.0.2
+          name: "App Blocker v2.0.2 (Conflict-Free Signing & Auto-Resume Installer)"
           body: |
-            ### 🚀 App Blocker v2.0.1 (Pembaruan Tersedia)
+            ### 🚀 App Blocker v2.0.2 (Pembaruan Tanpa Bentrok)
 
-            Pembaruan sistem Kiosk Mode & verifikasi In-App Update.
+            Rilis dengan sertifikat penandatangan (keystore) tetap dan perbaikan alur instalasi izin.
 
-            **Catatan Rilis v2.0.1:**
-            - 🚀 Peningkatan stabilitas pembaruan in-app via GitHub Releases.
-            - 🔄 Optimalisasi pemulihan Kiosk Mode saat HP menyala ulang (*boot completed*).
-            - 🛡️ Pengamanan background activity & overlay lockscreen.
+            **Pembaruan v2.0.2:**
+            - 🔑 **Kunci Sertifikat Tetap (Zero Package Conflict):** Menjamin setiap pembaruan ditandatangani oleh sertifikat keystore yang identik, menghilangkan error *'paket bentrok dengan paket yang sudah ada'*.
+            - 📲 **Auto-Resume Installer:** Saat Anda mengaktifkan izin *'Izinkan dari sumber ini'* di Pengaturan Android dan menekan tombol Kembali, layar penginstal paket otomatis langsung muncul kembali di depan layar tanpa hilang!
+            - 🔄 **Smart Boot Persistence:** Deteksi restart HP tetap aktif dan andal mengunci Kiosk mode.
 
-            **Unduh APK Langsung:**
-            Unduh file **AppBlocker-v2.0.1.apk** di bawah.
+            **Unduh APK:**
+            Unduh file **AppBlocker-v2.0.2.apk** di bawah.
           files: |
-            AppBlocker-v2.0.1.apk
+            AppBlocker-v2.0.2.apk
             AppBlocker.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

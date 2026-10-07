@@ -100,6 +100,7 @@ public class MainActivity extends AppCompatActivity implements AppAdapter.OnAppS
             return;
         }
         updatePermissionsUI();
+        UpdateManager.resumePendingInstall(this);
     }
 
     private void initViews() {

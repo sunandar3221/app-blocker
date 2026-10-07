@@ -33,6 +33,7 @@ public class UpdateManager {
     private static final String GITHUB_REPO = "sunandar3221/app-blocker";
     private static final String API_URL = "https://api.github.com/repos/" + GITHUB_REPO + "/releases/latest";
     private static final String UPDATE_CHANNEL_ID = "kiosk_app_updates";
+    private static File pendingApkFile = null;
 
     public static class ReleaseInfo {
         public String tagName;
@@ -322,7 +323,8 @@ public class UpdateManager {
             // Check unknown sources installation permission on Android 8.0+ (Oreo)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 if (!activity.getPackageManager().canRequestPackageInstalls()) {
-                    Toast.makeText(activity, "Izinkan penginstalan aplikasi dari sumber ini untuk melanjutkan pembaruan.", Toast.LENGTH_LONG).show();
+                    pendingApkFile = apkFile;
+                    Toast.makeText(activity, "Aktifkan izin 'Izinkan dari sumber ini', lalu installer akan otomatis terbuka.", Toast.LENGTH_LONG).show();
                     Intent permissionIntent = new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES);
                     permissionIntent.setData(Uri.parse("package:" + activity.getPackageName()));
                     activity.startActivity(permissionIntent);
@@ -345,6 +347,22 @@ public class UpdateManager {
         } catch (Throwable t) {
             Log.e(TAG, "Error launching package installer: " + t.getMessage(), t);
             Toast.makeText(activity, "Gagal membuka installer APK: " + t.getMessage(), Toast.LENGTH_LONG).show();
+        }
+    }
+
+    /**
+     * Called when returning from unknown sources settings screen.
+     * Automatically resumes APK installation without losing the installer GUI!
+     */
+    public static void resumePendingInstall(Activity activity) {
+        if (activity == null || activity.isFinishing()) return;
+        if (pendingApkFile != null && pendingApkFile.exists()) {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O || activity.getPackageManager().canRequestPackageInstalls()) {
+                File apk = pendingApkFile;
+                pendingApkFile = null;
+                Log.d(TAG, "Resuming pending APK install after permission granted.");
+                installApk(activity, apk);
+            }
         }
     }
 }

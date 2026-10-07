@@ -10,8 +10,8 @@ android {
         applicationId "com.appblocker.kiosk"
         minSdk 24
         targetSdk 34
-        versionCode 3
-        versionName "2.0.1"
+        versionCode 4
+        versionName "2.0.2"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -27,13 +27,31 @@ android {
         }
     }
 
+    signingConfigs {
+        release {
+            def keystoreFile = file('../keystore/app-release.jks')
+            if (keystoreFile.exists()) {
+                storeFile keystoreFile
+                storePassword 'appblocker_secure_key_2026'
+                keyAlias 'appblocker'
+                keyPassword 'appblocker_secure_key_2026'
+            }
+        }
+    }
+
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            if (file('../keystore/app-release.jks').exists()) {
+                signingConfig signingConfigs.release
+            }
         }
         debug {
             debuggable true
+            if (file('../keystore/app-release.jks').exists()) {
+                signingConfig signingConfigs.release
+            }
         }
     }
 
