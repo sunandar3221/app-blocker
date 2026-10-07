@@ -54,38 +54,37 @@ jobs:
         run: |
           RAW_APK=$(find app/build/outputs/apk/debug -name "*.apk" | head -n 1)
           echo "Raw APK: $RAW_APK"
-          cp "$RAW_APK" AppBlocker-v2.0.0.apk
+          cp "$RAW_APK" AppBlocker-v2.0.1.apk
           cp "$RAW_APK" AppBlocker.apk
-          echo "apk_path=AppBlocker-v2.0.0.apk" >> $GITHUB_OUTPUT
+          echo "apk_path=AppBlocker-v2.0.1.apk" >> $GITHUB_OUTPUT
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: AppBlocker-v2.0.0-apk
-          path: AppBlocker-v2.0.0.apk
+          name: AppBlocker-v2.0.1-apk
+          path: AppBlocker-v2.0.1.apk
           retention-days: 14
 
       - name: Publish to GitHub Releases
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v2.0.0
-          name: "App Blocker v2.0.0 (Boot Persistence & In-App Auto Update)"
+          tag_name: v2.0.1
+          name: "App Blocker v2.0.1 (Update Test Release)"
           body: |
-            ### 🚀 App Blocker v2.0.0 (Major Release)
+            ### 🚀 App Blocker v2.0.1 (Pembaruan Tersedia)
 
-            Aplikasi Kiosk Mode Android dengan pengamanan native C++ (NDK).
+            Pembaruan sistem Kiosk Mode & verifikasi In-App Update.
 
-            **Pembaruan v2.0.0:**
-            - 🔄 **Smart Boot Persistence:** Jika HP direstart saat Kiosk Mode aktif, sistem otomatis mendeteksi status dan langsung mengembalikan HP ke Kiosk Mode. Jika Kiosk tidak aktif, HP tetap normal tanpa mengganggu.
-            - 🔔 **Sistem Notifikasi & Auto-Update:** Mengecek rilis terbaru langsung dari GitHub Releases, menampilkan dialog konfirmasi, mengunduh, dan memperbarui aplikasi secara mulus tanpa bentrok package.
-            - 🔒 **Native C++ Engine:** Salted SHA-256 PIN hashing & dynamic allowed package filter.
-            - 🛡️ **Proteksi Kiosk Lengkap:** Device Admin, Accessibility Service, Overlay Bubble, dan Anti-Kill Battery.
+            **Catatan Rilis v2.0.1:**
+            - 🚀 Peningkatan stabilitas pembaruan in-app via GitHub Releases.
+            - 🔄 Optimalisasi pemulihan Kiosk Mode saat HP menyala ulang (*boot completed*).
+            - 🛡️ Pengamanan background activity & overlay lockscreen.
 
-            **Unduh APK:**
-            Unduh file **AppBlocker-v2.0.0.apk** di bawah.
+            **Unduh APK Langsung:**
+            Unduh file **AppBlocker-v2.0.1.apk** di bawah.
           files: |
-            AppBlocker-v2.0.0.apk
+            AppBlocker-v2.0.1.apk
             AppBlocker.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
