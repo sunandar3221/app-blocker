@@ -9,7 +9,7 @@ import java.util.List;
 public class NativeKioskManager {
     private static final String TAG = "NativeKioskManager";
     private static boolean isLoaded = false;
-    private static boolean isInitialized = false;
+    private static boolean isImeRegistered = false;
 
     static {
         try {
@@ -26,13 +26,12 @@ public class NativeKioskManager {
             return;
         }
 
-        if (!isInitialized) {
-            try {
-                String filesDir = context.getFilesDir().getAbsolutePath();
-                nativeInit(filesDir);
-                isInitialized = true;
+        try {
+            String filesDir = context.getFilesDir().getAbsolutePath();
+            nativeInit(filesDir);
 
-                // Dynamically register all enabled soft keyboards to whitelist
+            if (!isImeRegistered) {
+                isImeRegistered = true;
                 InputMethodManager imm = (InputMethodManager) context.getSystemService(Context.INPUT_METHOD_SERVICE);
                 if (imm != null) {
                     List<InputMethodInfo> imes = imm.getEnabledInputMethodList();
@@ -46,9 +45,9 @@ public class NativeKioskManager {
                         }
                     }
                 }
-            } catch (Throwable t) {
-                Log.e(TAG, "Error initializing NativeKioskManager: " + t.getMessage());
             }
+        } catch (Throwable t) {
+            Log.e(TAG, "Error initializing NativeKioskManager: " + t.getMessage());
         }
     }
 

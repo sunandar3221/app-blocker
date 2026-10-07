@@ -8,7 +8,6 @@ import android.content.pm.ResolveInfo;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
-import android.view.KeyEvent;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.inputmethod.InputMethodInfo;
 import android.view.inputmethod.InputMethodManager;
@@ -22,6 +21,7 @@ public class KioskAccessibilityService extends AccessibilityService {
     private static final String TAG = "KioskAccessibility";
     private final Handler handler = new Handler(Looper.getMainLooper());
     private long lastWarningTime = 0;
+    private long lastRedirectTime = 0;
     private final Set<String> launcherPackages = new HashSet<>();
 
     @Override
@@ -51,26 +51,28 @@ public class KioskAccessibilityService extends AccessibilityService {
         } catch (Throwable ignored) {}
     }
 
-    @Override
-    protected boolean onKeyEvent(KeyEvent event) {
-        try {
-            NativeKioskManager.init(getApplicationContext());
-            if (NativeKioskManager.nativeIsKioskActive()) {
-                int keyCode = event.getKeyCode();
-                // Intercept and consume Home and Recent Apps button presses
-                if (keyCode == KeyEvent.KEYCODE_HOME ||
-                    keyCode == KeyEvent.KEYCODE_APP_SWITCH ||
-                    keyCode == KeyEvent.KEYCODE_SEARCH) {
-                    Log.d(TAG, "Intercepted navigation key: " + keyCode);
-                    // Force target app to front if home/recents was pressed
-                    blockAndRedirect("key_navigation");
-                    return true; // Consume event completely
-                }
-            }
-        } catch (Throwable t) {
-            Log.e(TAG, "Error handling onKeyEvent", t);
+    private boolean isLauncherPackage(String packageName) {
+        if (packageName == null || packageName.isEmpty()) return false;
+        if (launcherPackages.isEmpty()) {
+            loadLauncherPackages();
         }
-        return super.onKeyEvent(event);
+        if (launcherPackages.contains(packageName)) return true;
+        String lower = packageName.toLowerCase();
+        return lower.contains("launcher") ||
+               lower.contains("home") ||
+               lower.contains("quickstep") ||
+               lower.contains("nexuslauncher") ||
+               lower.contains("trebuchet") ||
+               lower.equals("com.sec.android.app.launcher") ||
+               lower.equals("com.miui.home") ||
+               lower.equals("com.mi.android.globallauncher") ||
+               lower.equals("com.oppo.launcher") ||
+               lower.equals("com.coloros.home") ||
+               lower.equals("com.bbk.launcher2") ||
+               lower.equals("com.vivo.upslide") ||
+               lower.equals("com.asus.launcher") ||
+               lower.equals("com.motorola.launcher3") ||
+               lower.equals("com.teslacoilsw.launcher");
     }
 
     @Override
@@ -91,7 +93,7 @@ public class KioskAccessibilityService extends AccessibilityService {
             if (packageNameChar == null) return;
             String packageName = packageNameChar.toString();
 
-            // 1. Allow our own app (UnlockActivity, Pin Dialogs)
+            // 1. Allow our own app (UnlockActivity, Pin Dialogs, MainActivity)
             if (packageName.equals(getPackageName())) {
                 return;
             }
@@ -106,7 +108,7 @@ public class KioskAccessibilityService extends AccessibilityService {
                 CharSequence className = event.getClassName();
                 String cls = (className != null) ? className.toString().toLowerCase() : "";
                 // If user is pulling down notifications or opening recents panel
-                if (cls.contains("panel") || cls.contains("shade") || cls.contains("recents") || cls.contains("overview")) {
+                if (cls.contains("panel") || cls.contains("shade") || cls.contains("recents") || cls.contains("overview") || cls.contains("qs")) {
                     Log.w(TAG, "SystemUI notification/recents panel detected. Collapsing...");
                     performGlobalAction(GLOBAL_ACTION_BACK);
                     try {
@@ -119,10 +121,8 @@ public class KioskAccessibilityService extends AccessibilityService {
                 return;
             }
 
-            // 4. Catch Home Launchers immediately (gesture navigation / home button)
-            if (launcherPackages.contains(packageName) ||
-                packageName.contains("launcher") ||
-                packageName.contains("home")) {
+            // 4. Catch Home Launchers immediately (gesture navigation / home button / recent apps)
+            if (isLauncherPackage(packageName)) {
                 Log.w(TAG, "Launcher detected in kiosk mode: " + packageName);
                 blockAndRedirect(packageName);
                 return;
@@ -169,6 +169,11 @@ public class KioskAccessibilityService extends AccessibilityService {
 
     private synchronized void blockAndRedirect(String attemptedPackage) {
         long now = System.currentTimeMillis();
+        // Prevent rapid intent thrashing while maintaining instantaneous blocking
+        if (now - lastRedirectTime < 150) {
+            return;
+        }
+        lastRedirectTime = now;
 
         if (now - lastWarningTime > 2500) {
             lastWarningTime = now;

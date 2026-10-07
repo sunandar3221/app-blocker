@@ -96,9 +96,16 @@ void KioskCore::loadState() {
     if (file.is_open()) {
         std::string activeStr;
         if (std::getline(file, activeStr)) {
+            while (!activeStr.empty() && (activeStr.back() == '\r' || activeStr.back() == ' ')) {
+                activeStr.pop_back();
+            }
             isKioskActive_ = (activeStr == "1");
         }
-        std::getline(file, targetPackage_);
+        if (std::getline(file, targetPackage_)) {
+            while (!targetPackage_.empty() && (targetPackage_.back() == '\r' || targetPackage_.back() == ' ')) {
+                targetPackage_.pop_back();
+            }
+        }
         file.close();
         LOGD("Loaded kiosk state: active=%d, target=%s", isKioskActive_ ? 1 : 0, targetPackage_.c_str());
     } else {
@@ -200,11 +207,17 @@ bool KioskCore::stopKiosk(const std::string& pin) {
 
 bool KioskCore::isKioskActive() {
     std::lock_guard<std::mutex> lock(mutex_);
+    if (!storageDir_.empty()) {
+        loadState();
+    }
     return isKioskActive_;
 }
 
 std::string KioskCore::getTargetPackage() {
     std::lock_guard<std::mutex> lock(mutex_);
+    if (!storageDir_.empty()) {
+        loadState();
+    }
     return targetPackage_;
 }
 
