@@ -3,31 +3,74 @@ package com.appblocker.kiosk;
 import android.accessibilityservice.AccessibilityService;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.content.pm.ResolveInfo;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
+import android.view.KeyEvent;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.inputmethod.InputMethodInfo;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.Toast;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 public class KioskAccessibilityService extends AccessibilityService {
 
     private static final String TAG = "KioskAccessibility";
     private final Handler handler = new Handler(Looper.getMainLooper());
     private long lastWarningTime = 0;
-    private long lastRedirectTime = 0;
+    private final Set<String> launcherPackages = new HashSet<>();
 
     @Override
     protected void onServiceConnected() {
         super.onServiceConnected();
         try {
             NativeKioskManager.init(getApplicationContext());
+            loadLauncherPackages();
             Log.d(TAG, "Kiosk Accessibility Service connected.");
         } catch (Throwable t) {
             Log.e(TAG, "Error in onServiceConnected", t);
         }
+    }
+
+    private void loadLauncherPackages() {
+        try {
+            PackageManager pm = getPackageManager();
+            Intent intent = new Intent(Intent.ACTION_MAIN);
+            intent.addCategory(Intent.CATEGORY_HOME);
+            List<ResolveInfo> resolveInfos = pm.queryIntentActivities(intent, PackageManager.MATCH_DEFAULT_ONLY);
+            launcherPackages.clear();
+            for (ResolveInfo ri : resolveInfos) {
+                if (ri.activityInfo != null) {
+                    launcherPackages.add(ri.activityInfo.packageName);
+                }
+            }
+        } catch (Throwable ignored) {}
+    }
+
+    @Override
+    protected boolean onKeyEvent(KeyEvent event) {
+        try {
+            NativeKioskManager.init(getApplicationContext());
+            if (NativeKioskManager.nativeIsKioskActive()) {
+                int keyCode = event.getKeyCode();
+                // Intercept and consume Home and Recent Apps button presses
+                if (keyCode == KeyEvent.KEYCODE_HOME ||
+                    keyCode == KeyEvent.KEYCODE_APP_SWITCH ||
+                    keyCode == KeyEvent.KEYCODE_SEARCH) {
+                    Log.d(TAG, "Intercepted navigation key: " + keyCode);
+                    // Force target app to front if home/recents was pressed
+                    blockAndRedirect("key_navigation");
+                    return true; // Consume event completely
+                }
+            }
+        } catch (Throwable t) {
+            Log.e(TAG, "Error handling onKeyEvent", t);
+        }
+        return super.onKeyEvent(event);
     }
 
     @Override
@@ -44,26 +87,48 @@ public class KioskAccessibilityService extends AccessibilityService {
                 return;
             }
 
-            // If user is currently on the Unlock / PIN screen, NEVER block or close keyboard!
-            if (UnlockActivity.isUnlockScreenActive) {
-                return;
-            }
-
             CharSequence packageNameChar = event.getPackageName();
             if (packageNameChar == null) return;
             String packageName = packageNameChar.toString();
 
-            // Allow our own app windows (dialogs, activities)
+            // 1. Allow our own app (UnlockActivity, Pin Dialogs)
             if (packageName.equals(getPackageName())) {
                 return;
             }
 
-            // Allow soft keyboards and input methods
+            // 2. Allow soft keyboards / input methods so typing PIN or app text is never interrupted
             if (isInputMethod(packageName)) {
                 return;
             }
 
-            // Native C++ check: is this package permitted while kiosk is running?
+            // 3. Catch SystemUI attempts (Notification Shade, Quick Settings, Recents Overview)
+            if (packageName.equals("com.android.systemui")) {
+                CharSequence className = event.getClassName();
+                String cls = (className != null) ? className.toString().toLowerCase() : "";
+                // If user is pulling down notifications or opening recents panel
+                if (cls.contains("panel") || cls.contains("shade") || cls.contains("recents") || cls.contains("overview")) {
+                    Log.w(TAG, "SystemUI notification/recents panel detected. Collapsing...");
+                    performGlobalAction(GLOBAL_ACTION_BACK);
+                    try {
+                        sendBroadcast(new Intent(Intent.ACTION_CLOSE_SYSTEM_DIALOGS));
+                    } catch (Throwable ignored) {}
+                    blockAndRedirect(packageName);
+                    return;
+                }
+                // Allow standard status bar rendering when not opening panels
+                return;
+            }
+
+            // 4. Catch Home Launchers immediately (gesture navigation / home button)
+            if (launcherPackages.contains(packageName) ||
+                packageName.contains("launcher") ||
+                packageName.contains("home")) {
+                Log.w(TAG, "Launcher detected in kiosk mode: " + packageName);
+                blockAndRedirect(packageName);
+                return;
+            }
+
+            // 5. Native C++ check: is this package permitted while kiosk is running?
             if (NativeKioskManager.nativeIsPackageAllowed(packageName)) {
                 return;
             }
@@ -104,11 +169,6 @@ public class KioskAccessibilityService extends AccessibilityService {
 
     private synchronized void blockAndRedirect(String attemptedPackage) {
         long now = System.currentTimeMillis();
-        // Prevent redirect loop and spamming startActivity
-        if (now - lastRedirectTime < 1200) {
-            return;
-        }
-        lastRedirectTime = now;
 
         if (now - lastWarningTime > 2500) {
             lastWarningTime = now;
@@ -123,6 +183,11 @@ public class KioskAccessibilityService extends AccessibilityService {
             });
         }
 
+        // Close any opened system dialogs or notification shades
+        try {
+            sendBroadcast(new Intent(Intent.ACTION_CLOSE_SYSTEM_DIALOGS));
+        } catch (Throwable ignored) {}
+
         String targetPackage = NativeKioskManager.nativeGetTargetPackage();
         if (targetPackage != null && !targetPackage.isEmpty() && !targetPackage.equals(attemptedPackage)) {
             try {
@@ -131,7 +196,7 @@ public class KioskAccessibilityService extends AccessibilityService {
                     launchIntent.addFlags(
                             Intent.FLAG_ACTIVITY_NEW_TASK |
                             Intent.FLAG_ACTIVITY_REORDER_TO_FRONT |
-                            Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED
+                            Intent.FLAG_ACTIVITY_CLEAR_TOP
                     );
                     startActivity(launchIntent);
                 }

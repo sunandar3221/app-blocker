@@ -15,10 +15,12 @@ public class UnlockActivity extends AppCompatActivity {
 
     private EditText etPin;
     private TextView tvError;
+    private boolean isUnlocked = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        setFinishOnTouchOutside(false);
         setContentView(R.layout.activity_unlock);
 
         NativeKioskManager.init(getApplicationContext());
@@ -89,9 +91,21 @@ public class UnlockActivity extends AppCompatActivity {
     }
 
     @Override
+    protected void onUserLeaveHint() {
+        super.onUserLeaveHint();
+        // Prevent bypassing lock screen via Home or Recents while on Unlock Screen!
+        if (!isUnlocked && NativeKioskManager.nativeIsKioskActive()) {
+            returnToKioskApp();
+        }
+    }
+
+    @Override
     protected void onDestroy() {
         super.onDestroy();
         isUnlockScreenActive = false;
+        if (!isUnlocked && NativeKioskManager.nativeIsKioskActive()) {
+            returnToKioskApp();
+        }
     }
 
     private void attemptUnlock() {
@@ -104,6 +118,8 @@ public class UnlockActivity extends AppCompatActivity {
         // Native C++ verification and deactivation
         boolean success = NativeKioskManager.nativeStopKiosk(enteredPin);
         if (success) {
+            isUnlocked = true;
+
             // Stop floating bubble service
             Intent stopFloating = new Intent(this, FloatingExitService.class);
             stopFloating.setAction(FloatingExitService.ACTION_STOP);
@@ -128,7 +144,11 @@ public class UnlockActivity extends AppCompatActivity {
         if (targetPackage != null && !targetPackage.isEmpty()) {
             Intent launchIntent = getPackageManager().getLaunchIntentForPackage(targetPackage);
             if (launchIntent != null) {
-                launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
+                launchIntent.addFlags(
+                    Intent.FLAG_ACTIVITY_NEW_TASK |
+                    Intent.FLAG_ACTIVITY_REORDER_TO_FRONT |
+                    Intent.FLAG_ACTIVITY_CLEAR_TOP
+                );
                 startActivity(launchIntent);
             }
         }

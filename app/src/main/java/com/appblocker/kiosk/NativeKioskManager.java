@@ -9,6 +9,7 @@ import java.util.List;
 public class NativeKioskManager {
     private static final String TAG = "NativeKioskManager";
     private static boolean isLoaded = false;
+    private static boolean isInitialized = false;
 
     static {
         try {
@@ -20,13 +21,18 @@ public class NativeKioskManager {
         }
     }
 
-    public static void init(Context context) {
-        if (isLoaded && context != null) {
-            String filesDir = context.getFilesDir().getAbsolutePath();
-            nativeInit(filesDir);
+    public static synchronized void init(Context context) {
+        if (!isLoaded || context == null) {
+            return;
+        }
 
-            // Dynamically register all enabled soft keyboards to whitelist
+        if (!isInitialized) {
             try {
+                String filesDir = context.getFilesDir().getAbsolutePath();
+                nativeInit(filesDir);
+                isInitialized = true;
+
+                // Dynamically register all enabled soft keyboards to whitelist
                 InputMethodManager imm = (InputMethodManager) context.getSystemService(Context.INPUT_METHOD_SERVICE);
                 if (imm != null) {
                     List<InputMethodInfo> imes = imm.getEnabledInputMethodList();
@@ -41,7 +47,7 @@ public class NativeKioskManager {
                     }
                 }
             } catch (Throwable t) {
-                Log.e(TAG, "Error registering IME packages: " + t.getMessage());
+                Log.e(TAG, "Error initializing NativeKioskManager: " + t.getMessage());
             }
         }
     }

@@ -44,9 +44,11 @@ public class MainActivity extends AppCompatActivity implements AppAdapter.OnAppS
     private TextView tvStatusAdmin;
     private TextView tvStatusAccessibility;
     private TextView tvStatusOverlay;
+    private TextView tvStatusBattery;
     private Button btnGrantAdmin;
     private Button btnGrantAccessibility;
     private Button btnGrantOverlay;
+    private Button btnGrantBattery;
 
     private RecyclerView rvApps;
     private ProgressBar progressBar;
@@ -101,10 +103,12 @@ public class MainActivity extends AppCompatActivity implements AppAdapter.OnAppS
         tvStatusAdmin = findViewById(R.id.tvStatusAdmin);
         tvStatusAccessibility = findViewById(R.id.tvStatusAccessibility);
         tvStatusOverlay = findViewById(R.id.tvStatusOverlay);
+        tvStatusBattery = findViewById(R.id.tvStatusBattery);
 
         btnGrantAdmin = findViewById(R.id.btnGrantAdmin);
         btnGrantAccessibility = findViewById(R.id.btnGrantAccessibility);
         btnGrantOverlay = findViewById(R.id.btnGrantOverlay);
+        btnGrantBattery = findViewById(R.id.btnGrantBattery);
 
         rvApps = findViewById(R.id.rvApps);
         progressBar = findViewById(R.id.progressBar);
@@ -116,6 +120,7 @@ public class MainActivity extends AppCompatActivity implements AppAdapter.OnAppS
         btnGrantAdmin.setOnClickListener(v -> requestDeviceAdmin());
         btnGrantAccessibility.setOnClickListener(v -> requestAccessibility());
         btnGrantOverlay.setOnClickListener(v -> requestOverlay());
+        btnGrantBattery.setOnClickListener(v -> requestIgnoreBatteryOptimizations());
 
         btnStartKiosk.setOnClickListener(v -> startKioskMode());
 
@@ -284,7 +289,41 @@ public class MainActivity extends AppCompatActivity implements AppAdapter.OnAppS
             btnGrantOverlay.setVisibility(View.VISIBLE);
         }
 
+        boolean isBatteryIgnored = isIgnoringBatteryOptimizations();
+        if (isBatteryIgnored) {
+            tvStatusBattery.setText("✓ Aktif");
+            tvStatusBattery.setTextColor(Color.parseColor("#4CAF50"));
+            btnGrantBattery.setVisibility(View.GONE);
+        } else {
+            tvStatusBattery.setText("✗ Belum Aktif");
+            tvStatusBattery.setTextColor(Color.parseColor("#F59E0B"));
+            btnGrantBattery.setVisibility(View.VISIBLE);
+        }
+
         btnStartKiosk.setEnabled(isAdmin && isAccessibility && isOverlay && selectedApp != null);
+    }
+
+    private boolean isIgnoringBatteryOptimizations() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            android.os.PowerManager pm = (android.os.PowerManager) getSystemService(Context.POWER_SERVICE);
+            return pm != null && pm.isIgnoringBatteryOptimizations(getPackageName());
+        }
+        return true;
+    }
+
+    private void requestIgnoreBatteryOptimizations() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            try {
+                Intent intent = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
+                intent.setData(Uri.parse("package:" + getPackageName()));
+                startActivity(intent);
+            } catch (Throwable e) {
+                try {
+                    Intent intent = new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS);
+                    startActivity(intent);
+                } catch (Throwable ignored) {}
+            }
+        }
     }
 
     private boolean isAdminActive() {

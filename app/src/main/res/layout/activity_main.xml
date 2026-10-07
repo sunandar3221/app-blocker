@@ -179,6 +179,41 @@
                 android:textColor="@color/accent"
                 android:textSize="12sp" />
         </LinearLayout>
+
+        <!-- Battery Optimization Row -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="4. Tetap Aktif (Anti Mati)"
+                android:textColor="@color/text_primary"
+                android:textSize="13sp" />
+
+            <TextView
+                android:id="@+id/tvStatusBattery"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="10dp"
+                android:text="Memeriksa..."
+                android:textSize="12sp"
+                android:textStyle="bold" />
+
+            <Button
+                android:id="@+id/btnGrantBattery"
+                style="@style/Widget.MaterialComponents.Button.TextButton"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:text="Aktifkan"
+                android:textColor="@color/accent"
+                android:textSize="12sp" />
+        </LinearLayout>
     </LinearLayout>
 
     <!-- Search box -->

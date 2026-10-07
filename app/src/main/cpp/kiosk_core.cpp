@@ -18,7 +18,6 @@ KioskCore& KioskCore::getInstance() {
 KioskCore::KioskCore() : isKioskActive_(false) {
     // Whitelist core Android framework and critical system UI components
     systemAllowedPackages_.insert("android");
-    systemAllowedPackages_.insert("com.android.systemui");
     systemAllowedPackages_.insert("com.appblocker.kiosk");
     systemAllowedPackages_.insert("com.google.android.permissioncontroller");
     systemAllowedPackages_.insert("com.android.permissioncontroller");
