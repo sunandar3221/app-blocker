@@ -76,38 +76,38 @@ jobs:
         run: |
           RAW_APK=$(find app/build/outputs/apk/debug -name "*.apk" | head -n 1)
           echo "Raw APK: $RAW_APK"
-          cp "$RAW_APK" AppBlocker-v2.0.3.apk
+          cp "$RAW_APK" AppBlocker-v2.0.4.apk
           cp "$RAW_APK" AppBlocker.apk
-          echo "apk_path=AppBlocker-v2.0.3.apk" >> $GITHUB_OUTPUT
+          echo "apk_path=AppBlocker-v2.0.4.apk" >> $GITHUB_OUTPUT
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: AppBlocker-v2.0.3-apk
-          path: AppBlocker-v2.0.3.apk
+          name: AppBlocker-v2.0.4-apk
+          path: AppBlocker-v2.0.4.apk
           retention-days: 14
 
       - name: Publish to GitHub Releases
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v2.0.3
-          name: "App Blocker v2.0.3 (Watchdog Protection & Stable Boot Kiosk)"
+          tag_name: v2.0.4
+          name: "App Blocker v2.0.4 (Accessibility Watchdog & SystemUI Conflict Fix)"
           body: |
-            ### 🚀 App Blocker v2.0.3 (Perbaikan Boot Kiosk & Aksesibilitas)
+            ### 🚀 App Blocker v2.0.4 (Perbaikan Aksesibilitas Mati Sendiri)
 
-            Pembaruan kritis untuk stabilitas boot restart HP dan pencegahan izin aksesibilitas mati sendiri oleh sistem Android.
+            Pembaruan kritis untuk mengatasi bug izin Aksesibilitas yang mati tiba-tiba saat pemakaian.
 
-            **Pembaruan v2.0.3:**
-            - 🛡️ **Anti-Crash & Anti-Watchdog Disabling:** Menghilangkan looping restart activity (`FLAG_ACTIVITY_CLEAR_TOP`) yang menyebabkan sistem Android mendeteksi ANR/thrashing dan mematikan izin aksesibilitas.
-            - 🔄 **Stabilitas Kiosk Pasca Restart (Reboot Persistence):** Memperbaiki handling jendela dan overlay bubble agar tetap menyala stabil tanpa pop-up hilang atau tertutup sendiri saat HP selesai menyala.
-            - 🔑 **Conflict-Free Signing:** Ditandatangani otomatis dengan sertifikat konsisten sehingga pembaruan in-app via GitHub Releases berjalan lancar tanpa bentrok.
-            - 📲 **Auto-Resume Installer:** Menu install tetap lanjut otomatis setelah mengaktifkan izin sumber tidak dikenal.
+            **Pembaruan v2.0.4:**
+            - 🛡️ **Pencegahan Aksesibilitas Mati (Watchdog Disabling):** Menghapus eksekusi ganda `blockAndRedirect` dan `performGlobalAction(BACK)` pada jendela SystemUI. Di Android modern, aksi beruntun saat status bar disentuh memicu deteksi crash/thrashing oleh Accessibility Watchdog sehingga sistem Android mematikan izin aksesibilitas secara otomatis.
+            - ⏱️ **Kestabilan Event Loop:** Memperbaiki penanganan onUnbind dan verifikasi status aktif layanan secara langsung.
+            - 🔑 **Conflict-Free Signing:** Sertifikat penandatangan identik dan aman tanpa bentrok.
+            - 📲 **In-App Update:** Dukungan update langsung dari aplikasi.
 
             **Unduh APK:**
-            Unduh file **AppBlocker-v2.0.3.apk** di bawah.
+            Unduh file **AppBlocker-v2.0.4.apk** di bawah.
           files: |
-            AppBlocker-v2.0.3.apk
+            AppBlocker-v2.0.4.apk
             AppBlocker.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

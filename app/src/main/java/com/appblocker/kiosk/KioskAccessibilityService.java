@@ -28,10 +28,16 @@ public class KioskAccessibilityService extends AccessibilityService {
     private long lastBootResumeTime = 0;
     private final Set<String> launcherPackages = new HashSet<>();
     private BroadcastReceiver screenReceiver;
+    private static volatile KioskAccessibilityService sInstance = null;
+
+    public static boolean isRunning() {
+        return sInstance != null;
+    }
 
     @Override
     protected void onServiceConnected() {
         super.onServiceConnected();
+        sInstance = this;
         try {
             NativeKioskManager.init(getApplicationContext());
             loadLauncherPackages();
@@ -46,6 +52,13 @@ public class KioskAccessibilityService extends AccessibilityService {
         } catch (Throwable t) {
             Log.e(TAG, "Error in onServiceConnected", t);
         }
+    }
+
+    @Override
+    public boolean onUnbind(Intent intent) {
+        sInstance = null;
+        Log.w(TAG, "Accessibility service unbound by system!");
+        return super.onUnbind(intent);
     }
 
     private void registerScreenReceiver() {
@@ -199,7 +212,6 @@ public class KioskAccessibilityService extends AccessibilityService {
                 if (cls.contains("panel") || cls.contains("shade") || cls.contains("recents") || cls.contains("overview") || cls.contains("qs")) {
                     Log.w(TAG, "SystemUI notification/recents panel detected. Collapsing...");
                     performGlobalAction(GLOBAL_ACTION_BACK);
-                    blockAndRedirect(packageName);
                     return;
                 }
                 return;
@@ -293,6 +305,7 @@ public class KioskAccessibilityService extends AccessibilityService {
     @Override
     public void onDestroy() {
         super.onDestroy();
+        sInstance = null;
         if (screenReceiver != null) {
             try {
                 unregisterReceiver(screenReceiver);

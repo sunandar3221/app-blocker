@@ -340,6 +340,9 @@ public class MainActivity extends AppCompatActivity implements AppAdapter.OnAppS
     }
 
     private boolean isAccessibilityServiceEnabled() {
+        if (KioskAccessibilityService.isRunning()) {
+            return true;
+        }
         try {
             int accessibilityEnabled = 0;
             try {
