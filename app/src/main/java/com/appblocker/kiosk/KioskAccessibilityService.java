@@ -29,55 +29,36 @@ public class KioskAccessibilityService extends AccessibilityService {
     private long lastWarningTime = 0;
     private long lastRedirectTime = 0;
     private long lastBootResumeTime = 0;
-    private long lastBackPressTime = 0;
     private final Set<String> launcherPackages = new HashSet<>();
     private BroadcastReceiver screenReceiver;
     private static volatile KioskAccessibilityService sInstance = null;
 
-    private final Runnable pendingRedirectRunnable = new Runnable() {
-        @Override
-        public void run() {
-            executeRedirect();
-        }
-    };
+    // Fast in-memory state cache to prevent disk I/O on main looper
+    private static volatile boolean sCachedKioskActive = false;
+    private static volatile String sCachedTargetPackage = "";
+    private static volatile long sLastStateCheck = 0;
 
     public static boolean isRunning() {
         return sInstance != null;
     }
 
-    @Override
-    protected boolean onKeyEvent(KeyEvent event) {
-        if (event == null) return false;
-        try {
-            NativeKioskManager.init(getApplicationContext());
-            if (!NativeKioskManager.nativeIsKioskActive()) {
-                return super.onKeyEvent(event);
-            }
+    public static void updateKioskCache(boolean active, String targetPackage) {
+        sCachedKioskActive = active;
+        sCachedTargetPackage = (targetPackage != null) ? targetPackage : "";
+        sLastStateCheck = System.currentTimeMillis();
+    }
 
-            int keyCode = event.getKeyCode();
-            int action = event.getAction();
-
-            // 1. Consume Home and App Switch (Recents) entirely so user cannot exit or trigger pinning
-            if (keyCode == KeyEvent.KEYCODE_HOME || keyCode == KeyEvent.KEYCODE_APP_SWITCH) {
-                Log.d(TAG, "Suppressed kiosk exit key: " + keyCode);
-                return true;
-            }
-
-            // 2. Suppress rapid Back key spam (< 350ms) to prevent target app from crashing/exiting
-            if (keyCode == KeyEvent.KEYCODE_BACK) {
-                if (action == KeyEvent.ACTION_DOWN) {
-                    long now = System.currentTimeMillis();
-                    if (now - lastBackPressTime < 350) {
-                        Log.d(TAG, "Suppressed rapid back key spam");
-                        return true;
-                    }
-                    lastBackPressTime = now;
-                }
-            }
-        } catch (Throwable t) {
-            Log.e(TAG, "Error handling key event", t);
+    private boolean isKioskActiveFast() {
+        long now = System.currentTimeMillis();
+        if (now - sLastStateCheck > 1200) {
+            sLastStateCheck = now;
+            try {
+                NativeKioskManager.init(getApplicationContext());
+                sCachedKioskActive = NativeKioskManager.nativeIsKioskActive();
+                sCachedTargetPackage = NativeKioskManager.nativeGetTargetPackage();
+            } catch (Throwable ignored) {}
         }
-        return super.onKeyEvent(event);
+        return sCachedKioskActive;
     }
 
     @Override
@@ -226,8 +207,7 @@ public class KioskAccessibilityService extends AccessibilityService {
                 return;
             }
 
-            NativeKioskManager.init(getApplicationContext());
-            if (!NativeKioskManager.nativeIsKioskActive()) {
+            if (!isKioskActiveFast()) {
                 return;
             }
 
@@ -235,14 +215,12 @@ public class KioskAccessibilityService extends AccessibilityService {
             if (packageNameChar == null) return;
             String packageName = packageNameChar.toString();
 
-            // 0. If current window is ALREADY the target app, do nothing and cancel pending redirect!
-            String targetPackage = NativeKioskManager.nativeGetTargetPackage();
-            if (targetPackage != null && !targetPackage.isEmpty() && packageName.equals(targetPackage)) {
-                handler.removeCallbacks(pendingRedirectRunnable);
+            // 0. If current window is ALREADY the target app, do nothing!
+            if (!sCachedTargetPackage.isEmpty() && packageName.equals(sCachedTargetPackage)) {
                 return;
             }
 
-            // 1. Allow our own app (UnlockActivity, Pin Dialogs, MainActivity)
+            // 1. Allow our own app (UnlockActivity, KioskGuardActivity, Pin Dialogs, MainActivity)
             if (packageName.equals(getPackageName())) {
                 return;
             }
@@ -252,18 +230,13 @@ public class KioskAccessibilityService extends AccessibilityService {
                 return;
             }
 
-            // 3. Catch SystemUI attempts (Notification Shade, Quick Settings, Recents Overview, Screen Pinning)
+            // 3. Catch SystemUI attempts (Notification Shade, Quick Settings, Recents Overview)
             if (packageName.equals("com.android.systemui")) {
                 CharSequence className = event.getClassName();
                 String cls = (className != null) ? className.toString().toLowerCase() : "";
                 if (cls.contains("panel") || cls.contains("shade") || cls.contains("recents") || cls.contains("overview") || cls.contains("qs")) {
                     Log.w(TAG, "SystemUI notification/recents panel detected. Collapsing...");
                     performGlobalAction(GLOBAL_ACTION_BACK);
-                    return;
-                }
-                if (cls.contains("pinning") || cls.contains("screenpinning")) {
-                    Log.w(TAG, "Screen pinning prompt detected in SystemUI. Redirecting to target...");
-                    blockAndRedirect(packageName);
                     return;
                 }
                 return;
@@ -315,77 +288,24 @@ public class KioskAccessibilityService extends AccessibilityService {
                lower.contains("touchtype");
     }
 
-    private boolean isTargetAppForeground(String targetPackage) {
-        if (targetPackage == null || targetPackage.isEmpty()) return false;
-        try {
-            ActivityManager am = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
-            if (am != null) {
-                List<ActivityManager.RunningTaskInfo> tasks = am.getRunningTasks(1);
-                if (tasks != null && !tasks.isEmpty()) {
-                    ComponentName topActivity = tasks.get(0).topActivity;
-                    if (topActivity != null && targetPackage.equals(topActivity.getPackageName())) {
-                        return true;
-                    }
-                }
-            }
-        } catch (Throwable ignored) {}
-        return false;
-    }
-
     private synchronized void blockAndRedirect(String attemptedPackage) {
         long now = System.currentTimeMillis();
-
-        if (now - lastWarningTime > 3000) {
-            lastWarningTime = now;
-            handler.post(() -> {
-                try {
-                    Toast.makeText(
-                            getApplicationContext(),
-                            "Kiosk Mode Aktif! Masukkan PIN untuk keluar.",
-                            Toast.LENGTH_SHORT
-                    ).show();
-                } catch (Throwable ignored) {}
-            });
-        }
-
-        // Cancel previous pending redirect to debounce multiple rapid events
-        handler.removeCallbacks(pendingRedirectRunnable);
-
-        long elapsed = now - lastRedirectTime;
-        if (elapsed < 600) {
-            // Post delayed so only the final debounce trigger executes
-            handler.postDelayed(pendingRedirectRunnable, 600 - elapsed);
+        // Cooldown 250ms to prevent WindowManager intent thrashing
+        if (now - lastRedirectTime < 250) {
             return;
         }
-
-        executeRedirect();
-    }
-
-    private synchronized void executeRedirect() {
-        lastRedirectTime = System.currentTimeMillis();
-        String targetPackage = NativeKioskManager.nativeGetTargetPackage();
-        if (targetPackage == null || targetPackage.isEmpty()) {
-            return;
-        }
-
-        // Don't thrash intent if target is already top of stack
-        if (isTargetAppForeground(targetPackage)) {
-            Log.d(TAG, "Target app is already in foreground, skipping redirect intent.");
-            return;
-        }
+        lastRedirectTime = now;
 
         try {
-            Intent launchIntent = getPackageManager().getLaunchIntentForPackage(targetPackage);
-            if (launchIntent != null) {
-                launchIntent.addFlags(
-                        Intent.FLAG_ACTIVITY_NEW_TASK |
-                        Intent.FLAG_ACTIVITY_REORDER_TO_FRONT |
-                        Intent.FLAG_ACTIVITY_SINGLE_TOP
-                );
-                startActivity(launchIntent);
-            }
+            Intent guardIntent = new Intent(this, KioskGuardActivity.class);
+            guardIntent.addFlags(
+                    Intent.FLAG_ACTIVITY_NEW_TASK |
+                    Intent.FLAG_ACTIVITY_REORDER_TO_FRONT |
+                    Intent.FLAG_ACTIVITY_SINGLE_TOP
+            );
+            startActivity(guardIntent);
         } catch (Throwable e) {
-            Log.e(TAG, "Error redirecting to target kiosk app: " + e.getMessage());
+            Log.e(TAG, "Error redirecting to KioskGuardActivity: " + e.getMessage());
         }
     }
 
@@ -393,7 +313,6 @@ public class KioskAccessibilityService extends AccessibilityService {
     public void onDestroy() {
         super.onDestroy();
         sInstance = null;
-        handler.removeCallbacks(pendingRedirectRunnable);
         if (screenReceiver != null) {
             try {
                 unregisterReceiver(screenReceiver);

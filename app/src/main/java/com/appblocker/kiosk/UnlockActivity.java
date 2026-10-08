@@ -127,6 +127,9 @@ public class UnlockActivity extends AppCompatActivity {
                 }
             } catch (Throwable ignored) {}
 
+            // Update fast in-memory cache
+            KioskAccessibilityService.updateKioskCache(false, "");
+
             // Stop floating bubble service
             Intent stopFloating = new Intent(this, FloatingExitService.class);
             stopFloating.setAction(FloatingExitService.ACTION_STOP);

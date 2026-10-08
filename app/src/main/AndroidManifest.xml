@@ -37,6 +37,13 @@
             android:excludeFromRecents="true"
             android:theme="@style/Theme.AppBlocker.Dialog" />
 
+        <activity
+            android:name=".KioskGuardActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:excludeFromRecents="true"
+            android:theme="@style/Theme.AppBlocker" />
+
         <service
             android:name=".FloatingExitService"
             android:foregroundServiceType="specialUse"

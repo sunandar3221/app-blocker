@@ -76,39 +76,39 @@ jobs:
         run: |
           RAW_APK=$(find app/build/outputs/apk/debug -name "*.apk" | head -n 1)
           echo "Raw APK: $RAW_APK"
-          cp "$RAW_APK" AppBlocker-v2.0.5.apk
+          cp "$RAW_APK" AppBlocker-v2.0.6.apk
           cp "$RAW_APK" AppBlocker.apk
-          echo "apk_path=AppBlocker-v2.0.5.apk" >> $GITHUB_OUTPUT
+          echo "apk_path=AppBlocker-v2.0.6.apk" >> $GITHUB_OUTPUT
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: AppBlocker-v2.0.5-apk
-          path: AppBlocker-v2.0.5.apk
+          name: AppBlocker-v2.0.6-apk
+          path: AppBlocker-v2.0.6.apk
           retention-days: 14
 
       - name: Publish to GitHub Releases
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v2.0.5
-          name: "App Blocker v2.0.5 (Anti-Spam Watchdog Protection & Pinning Fix)"
+          tag_name: v2.0.6
+          name: "App Blocker v2.0.6 (KioskGuard Foundation & Official Screen Pinning)"
           body: |
-            ### 🚀 App Blocker v2.0.5 (Perbaikan Kiosk Mati & Aksesibilitas Terputus Saat Spam Tombol)
+            ### 🚀 App Blocker v2.0.6 (Solusi Permanen Anti-Spam Exit & Fitur Sematkan Aplikasi)
 
-            Pembaruan penting untuk mengatasi masalah kiosk mati, aksesibilitas terputus, dan konflik penyematan aplikasi (App Pinning) saat pengguna melakukan spam tombol keluar:
+            Pembaruan arsitektur besar untuk menyelesaikan masalah spam tombol keluar dan menambahkan fitur resmi **Sematkan Aplikasi (Screen Pinning / Lock Task)**:
 
-            **Pembaruan v2.0.5:**
-            - 🛡️ **Anti-Spam Hardware Key Filtering:** Mengaktifkan `canRequestFilterKeyEvents` pada Aksesibilitas. Tombol Home (`KEYCODE_HOME`) dan App Switch / Recents (`KEYCODE_APP_SWITCH`) langsung diredam di level sistem sehingga launcher atau gestur penyematan bawaan tidak memutus kiosk.
-            - ⚡ **Rate-Limiting Tombol Back:** Meredam penekanan tombol Kembali berkecepatan tinggi (<350ms) agar target app tidak crash atau finish berulang kali saat di-spam.
-            - 🔄 **Debounced Redirect Engine:** Mencegah penumpukan ratusan intent ke WindowManager dengan mekanisme debounce aman dan deteksi target app di foreground (`RunningTaskInfo`).
-            - 📌 **Screen Pinning & SystemUI Safety:** Menetralkan dialog penyematan layar bawaan OS dan secara otomatis melepaskan lock task mode saat PIN dimasukkan.
-            - 🔑 **Identical Signing Key:** Update via in-app installer berjalan mulus tanpa bentrok paket.
+            **Pembaruan v2.0.6:**
+            - 🛡️ **KioskGuard Foundation Activity:** Memasang Activity pelindung tetap (`KioskGuardActivity`) di bawah aplikasi yang dikunci. Saat pengguna menekan tombol Kembali secara berulang-ulang hingga aplikasi target `finish()`, layar tidak akan pernah jatuh ke Launcher! Layar jatuh ke `KioskGuardActivity` yang secara otomatis mengembalikan aplikasi target ke depan dalam 0.3 detik.
+            - 📌 **Dukungan Resmi Sematkan Aplikasi (Lock Task Mode):** Menambahkan tombol dan otomatisasi `startLockTask()` (Screen Pinning bawaan Android). Saat aktif, sistem operasi Android mengunci layar secara resmi sehingga tombol Beranda, Recents, dan notifikasi terkunci total.
+            - ⚡ **Zero Disk I/O & Memory Cache:** Menghilangkan pemanggilan pembacaan file dari Main Thread Accessibility Service sehingga izin Aksesibilitas tidak akan pernah dimatikan oleh Android Watchdog.
+            - 🔓 **Clean Unlock:** Melepaskan mode sematan (`stopLockTask()`) dan menutup layanan secara bersih saat PIN yang benar dimasukkan.
+            - 📲 **In-App Update:** Update langsung melalui tombol Cek Pembaruan di aplikasi.
 
             **Unduh APK:**
-            Unduh file **AppBlocker-v2.0.5.apk** di bawah ini.
+            Unduh file **AppBlocker-v2.0.6.apk** di bawah ini.
           files: |
-            AppBlocker-v2.0.5.apk
+            AppBlocker-v2.0.6.apk
             AppBlocker.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

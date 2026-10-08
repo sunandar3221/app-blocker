@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:gravity="center"
+    android:background="#0F172A"
+    android:padding="32dp">
+
+    <ImageView
+        android:id="@+id/ivGuardIcon"
+        android:layout_width="80dp"
+        android:layout_height="80dp"
+        android:src="@drawable/ic_shield"
+        android:contentDescription="Kiosk Guard Shield" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="20dp"
+        android:text="Kiosk Mode Aktif"
+        android:textColor="#F8FAFC"
+        android:textSize="24sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/tvGuardAppName"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="Aplikasi sedang dilindungi oleh App Blocker"
+        android:textColor="#94A3B8"
+        android:textSize="14sp"
+        android:gravity="center" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:layout_marginTop="36dp">
+
+        <Button
+            android:id="@+id/btnReturnToApp"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:text="Buka Aplikasi yang Dikunci"
+            android:textColor="#FFFFFF"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:backgroundTint="#3B82F6" />
+
+        <Button
+            android:id="@+id/btnPinScreen"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:layout_marginTop="12dp"
+            android:text="📌 Sematkan Aplikasi (Lock Task)"
+            android:textColor="#FFFFFF"
+            android:textSize="15sp"
+            android:backgroundTint="#6366F1" />
+
+        <Button
+            android:id="@+id/btnExitKiosk"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:layout_marginTop="12dp"
+            android:text="Keluar Kiosk (Masukkan PIN)"
+            android:textColor="#EF4444"
+            android:textSize="15sp"
+            android:backgroundTint="#1E293B" />
+    </LinearLayout>
+
+</LinearLayout>
