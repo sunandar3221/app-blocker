@@ -120,6 +120,13 @@ public class UnlockActivity extends AppCompatActivity {
         if (success) {
             isUnlocked = true;
 
+            // Stop screen pinning / lock task if active
+            try {
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
+                    stopLockTask();
+                }
+            } catch (Throwable ignored) {}
+
             // Stop floating bubble service
             Intent stopFloating = new Intent(this, FloatingExitService.class);
             stopFloating.setAction(FloatingExitService.ACTION_STOP);
@@ -147,7 +154,7 @@ public class UnlockActivity extends AppCompatActivity {
                 launchIntent.addFlags(
                     Intent.FLAG_ACTIVITY_NEW_TASK |
                     Intent.FLAG_ACTIVITY_REORDER_TO_FRONT |
-                    Intent.FLAG_ACTIVITY_CLEAR_TOP
+                    Intent.FLAG_ACTIVITY_SINGLE_TOP
                 );
                 startActivity(launchIntent);
             }
