@@ -56,13 +56,11 @@ public class KioskGuardActivity extends AppCompatActivity {
             startActivity(unlockIntent);
         });
 
-        // Auto pin if requested via intent extra
-        if (getIntent() != null && getIntent().getBooleanExtra(EXTRA_AUTO_PIN, false)) {
-            handler.postDelayed(this::enableScreenPinning, 400);
-        }
+        // Auto pin immediately via Lock Task Mode
+        enableScreenPinning();
 
         // Launch target app initially
-        handler.postDelayed(() -> launchTargetApp(false), 200);
+        handler.postDelayed(() -> launchTargetApp(false), 250);
     }
 
     @Override
@@ -75,6 +73,9 @@ public class KioskGuardActivity extends AppCompatActivity {
         }
 
         updateAppLabel();
+
+        // Re-enforce LockTaskMode
+        enableScreenPinning();
 
         // If user landed here because target app was finished/closed (e.g. back spam),
         // immediately bounce back to target app after brief delay
@@ -131,11 +132,18 @@ public class KioskGuardActivity extends AppCompatActivity {
     public void enableScreenPinning() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             try {
+                android.app.admin.DevicePolicyManager dpm = (android.app.admin.DevicePolicyManager) getSystemService(Context.DEVICE_POLICY_SERVICE);
+                android.content.ComponentName admin = new android.content.ComponentName(this, KioskDeviceAdminReceiver.class);
+                String target = NativeKioskManager.nativeGetTargetPackage();
+                if (dpm != null && dpm.isDeviceOwnerApp(getPackageName()) && target != null && !target.isEmpty()) {
+                    dpm.setLockTaskPackages(admin, new String[]{ getPackageName(), target });
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                        dpm.setLockTaskFeatures(admin, android.app.admin.DevicePolicyManager.LOCK_TASK_FEATURE_NONE);
+                    }
+                }
                 startLockTask();
-                Toast.makeText(this, "Aplikasi disematkan (Screen Pinning aktif)", Toast.LENGTH_SHORT).show();
             } catch (Throwable t) {
                 Log.e(TAG, "Failed to startLockTask: " + t.getMessage(), t);
-                Toast.makeText(this, "Tidak dapat menyematkan layar secara otomatis di perangkat ini.", Toast.LENGTH_SHORT).show();
             }
         }
     }

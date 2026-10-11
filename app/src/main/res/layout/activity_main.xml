@@ -126,7 +126,7 @@
                 android:textSize="12sp" />
         </LinearLayout>
 
-        <!-- Accessibility Row -->
+        <!-- Lock Task Mode Row -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -138,25 +138,26 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="2. Aksesibilitas"
+                android:text="2. Lock Task (Kiosk)"
                 android:textColor="@color/text_primary"
                 android:textSize="13sp" />
 
             <TextView
-                android:id="@+id/tvStatusAccessibility"
+                android:id="@+id/tvStatusLockTask"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginEnd="10dp"
-                android:text="Memeriksa..."
+                android:text="✓ Siap Digunakan"
+                android:textColor="#4CAF50"
                 android:textSize="12sp"
                 android:textStyle="bold" />
 
             <Button
-                android:id="@+id/btnGrantAccessibility"
+                android:id="@+id/btnInfoLockTask"
                 style="@style/Widget.MaterialComponents.Button.TextButton"
                 android:layout_width="wrap_content"
                 android:layout_height="36dp"
-                android:text="Aktifkan"
+                android:text="Info"
                 android:textColor="@color/accent"
                 android:textSize="12sp" />
         </LinearLayout>

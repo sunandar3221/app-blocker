@@ -42,11 +42,11 @@ public class MainActivity extends AppCompatActivity implements AppAdapter.OnAppS
     private DevicePolicyManager devicePolicyManager;
 
     private TextView tvStatusAdmin;
-    private TextView tvStatusAccessibility;
+    private TextView tvStatusLockTask;
     private TextView tvStatusOverlay;
     private TextView tvStatusBattery;
     private Button btnGrantAdmin;
-    private Button btnGrantAccessibility;
+    private Button btnInfoLockTask;
     private Button btnGrantOverlay;
     private Button btnGrantBattery;
 
@@ -105,12 +105,12 @@ public class MainActivity extends AppCompatActivity implements AppAdapter.OnAppS
 
     private void initViews() {
         tvStatusAdmin = findViewById(R.id.tvStatusAdmin);
-        tvStatusAccessibility = findViewById(R.id.tvStatusAccessibility);
+        tvStatusLockTask = findViewById(R.id.tvStatusLockTask);
         tvStatusOverlay = findViewById(R.id.tvStatusOverlay);
         tvStatusBattery = findViewById(R.id.tvStatusBattery);
 
         btnGrantAdmin = findViewById(R.id.btnGrantAdmin);
-        btnGrantAccessibility = findViewById(R.id.btnGrantAccessibility);
+        btnInfoLockTask = findViewById(R.id.btnInfoLockTask);
         btnGrantOverlay = findViewById(R.id.btnGrantOverlay);
         btnGrantBattery = findViewById(R.id.btnGrantBattery);
 
@@ -122,7 +122,9 @@ public class MainActivity extends AppCompatActivity implements AppAdapter.OnAppS
         rvApps.setLayoutManager(new LinearLayoutManager(this));
 
         btnGrantAdmin.setOnClickListener(v -> requestDeviceAdmin());
-        btnGrantAccessibility.setOnClickListener(v -> requestAccessibility());
+        if (btnInfoLockTask != null) {
+            btnInfoLockTask.setOnClickListener(v -> showLockTaskInfoDialog());
+        }
         btnGrantOverlay.setOnClickListener(v -> requestOverlay());
         btnGrantBattery.setOnClickListener(v -> requestIgnoreBatteryOptimizations());
 
@@ -265,7 +267,6 @@ public class MainActivity extends AppCompatActivity implements AppAdapter.OnAppS
 
     private void updatePermissionsUI() {
         boolean isAdmin = isAdminActive();
-        boolean isAccessibility = isAccessibilityServiceEnabled();
         boolean isOverlay = canDrawOverlays();
 
         if (isAdmin) {
@@ -278,14 +279,13 @@ public class MainActivity extends AppCompatActivity implements AppAdapter.OnAppS
             btnGrantAdmin.setVisibility(View.VISIBLE);
         }
 
-        if (isAccessibility) {
-            tvStatusAccessibility.setText("✓ Aktif");
-            tvStatusAccessibility.setTextColor(Color.parseColor("#4CAF50"));
-            btnGrantAccessibility.setVisibility(View.GONE);
+        boolean isDeviceOwner = (devicePolicyManager != null && devicePolicyManager.isDeviceOwnerApp(getPackageName()));
+        if (isDeviceOwner) {
+            tvStatusLockTask.setText("✓ Device Owner (Silent Lock)");
+            tvStatusLockTask.setTextColor(Color.parseColor("#4CAF50"));
         } else {
-            tvStatusAccessibility.setText("✗ Belum Aktif");
-            tvStatusAccessibility.setTextColor(Color.parseColor("#EF4444"));
-            btnGrantAccessibility.setVisibility(View.VISIBLE);
+            tvStatusLockTask.setText("✓ Lock Task Siap");
+            tvStatusLockTask.setTextColor(Color.parseColor("#4CAF50"));
         }
 
         if (isOverlay) {
@@ -309,7 +309,21 @@ public class MainActivity extends AppCompatActivity implements AppAdapter.OnAppS
             btnGrantBattery.setVisibility(View.VISIBLE);
         }
 
-        btnStartKiosk.setEnabled(isAdmin && isAccessibility && isOverlay && selectedApp != null);
+        // Accessibility is no longer required - LockTaskMode enforces kiosk mode!
+        btnStartKiosk.setEnabled(isAdmin && isOverlay && selectedApp != null);
+    }
+
+    private void showLockTaskInfoDialog() {
+        boolean isDeviceOwner = (devicePolicyManager != null && devicePolicyManager.isDeviceOwnerApp(getPackageName()));
+        String msg = isDeviceOwner
+                ? "Aplikasi sudah menjadi Device Owner! Lock Task Mode akan mengunci layar secara penuh dan senyap tanpa dialog konfirmasi sistem."
+                : "Aplikasi menggunakan Lock Task Mode (Screen Pinning resmi Android). Layanan Aksesibilitas TIDAK lagi dibutuhkan.\n\nTips Kiosk Mandiri:\nUntuk mengunci secara 100% otomatis tanpa dialog konfirmasi sistem, jadikan aplikasi Device Owner via ADB dengan perintah:\n\nadb shell dpm set-device-owner com.appblocker.kiosk/.KioskDeviceAdminReceiver";
+
+        new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("Informasi Lock Task Mode")
+                .setMessage(msg)
+                .setPositiveButton("Mengerti", null)
+                .show();
     }
 
     private boolean isIgnoringBatteryOptimizations() {
@@ -339,46 +353,6 @@ public class MainActivity extends AppCompatActivity implements AppAdapter.OnAppS
         return devicePolicyManager != null && devicePolicyManager.isAdminActive(adminComponent);
     }
 
-    private boolean isAccessibilityServiceEnabled() {
-        if (KioskAccessibilityService.isRunning()) {
-            return true;
-        }
-        try {
-            int accessibilityEnabled = 0;
-            try {
-                accessibilityEnabled = Settings.Secure.getInt(
-                        getContentResolver(),
-                        Settings.Secure.ACCESSIBILITY_ENABLED
-                );
-            } catch (Settings.SettingNotFoundException ignored) {}
-
-            if (accessibilityEnabled == 1) {
-                String settingValue = Settings.Secure.getString(
-                        getContentResolver(),
-                        Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
-                );
-                if (settingValue != null) {
-                    return settingValue.contains(getPackageName()) &&
-                           settingValue.contains(KioskAccessibilityService.class.getSimpleName());
-                }
-            }
-
-            // Fallback check
-            AccessibilityManager am = (AccessibilityManager) getSystemService(Context.ACCESSIBILITY_SERVICE);
-            if (am != null) {
-                List<AccessibilityServiceInfo> services = am.getEnabledAccessibilityServiceList(AccessibilityServiceInfo.FEEDBACK_ALL_MASK);
-                for (AccessibilityServiceInfo info : services) {
-                    if (info.getId() != null && info.getId().contains(KioskAccessibilityService.class.getSimpleName())) {
-                        return true;
-                    }
-                }
-            }
-        } catch (Throwable t) {
-            Log.e(TAG, "Error checking accessibility service status", t);
-        }
-        return false;
-    }
-
     private boolean canDrawOverlays() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             return Settings.canDrawOverlays(this);
@@ -392,12 +366,6 @@ public class MainActivity extends AppCompatActivity implements AppAdapter.OnAppS
         intent.putExtra(DevicePolicyManager.EXTRA_ADD_EXPLANATION,
                 "Device Admin diperlukan untuk mengamankan dan mengunci Kiosk Mode App Blocker.");
         startActivity(intent);
-    }
-
-    private void requestAccessibility() {
-        Intent intent = new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS);
-        startActivity(intent);
-        Toast.makeText(this, "Pilih dan aktifkan 'App Blocker'", Toast.LENGTH_LONG).show();
     }
 
     private void requestOverlay() {
@@ -463,12 +431,6 @@ public class MainActivity extends AppCompatActivity implements AppAdapter.OnAppS
             return;
         }
 
-        if (!isAccessibilityServiceEnabled()) {
-            Toast.makeText(this, "Harap aktifkan izin Aksesibilitas!", Toast.LENGTH_SHORT).show();
-            requestAccessibility();
-            return;
-        }
-
         if (!canDrawOverlays()) {
             Toast.makeText(this, "Harap aktifkan izin Tampilkan di Atas Aplikasi (Overlay)!", Toast.LENGTH_SHORT).show();
             requestOverlay();
@@ -478,6 +440,18 @@ public class MainActivity extends AppCompatActivity implements AppAdapter.OnAppS
         if (selectedApp == null) {
             Toast.makeText(this, "Pilih aplikasi yang ingin dikunci!", Toast.LENGTH_SHORT).show();
             return;
+        }
+
+        // If app is Device Owner, whitelist target and guard packages for silent LockTaskMode
+        try {
+            if (devicePolicyManager != null && devicePolicyManager.isDeviceOwnerApp(getPackageName())) {
+                devicePolicyManager.setLockTaskPackages(adminComponent, new String[]{ getPackageName(), selectedApp.getPackageName() });
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    devicePolicyManager.setLockTaskFeatures(adminComponent, DevicePolicyManager.LOCK_TASK_FEATURE_NONE);
+                }
+            }
+        } catch (Throwable t) {
+            Log.e(TAG, "Error configuring lock task packages in DevicePolicyManager", t);
         }
 
         // Native C++ activates kiosk lock & writes state to disk
@@ -498,9 +472,6 @@ public class MainActivity extends AppCompatActivity implements AppAdapter.OnAppS
         } catch (Throwable t) {
             Log.e(TAG, "Error starting FloatingExitService", t);
         }
-
-        // Update in-memory fast cache
-        KioskAccessibilityService.updateKioskCache(true, selectedApp.getPackageName());
 
         // Launch KioskGuardActivity as unkillable foundation which immediately launches target app
         try {
