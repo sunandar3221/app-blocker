@@ -63,11 +63,11 @@ public class MainActivity extends AppCompatActivity implements AppAdapter.OnAppS
 
         try {
             NativeKioskManager.init(getApplicationContext());
-            // If kiosk is already active, redirect immediately to Kiosk Guard!
+            // If kiosk is already active, redirect immediately to unlock screen!
             if (NativeKioskManager.nativeIsKioskActive()) {
-                Intent guardIntent = new Intent(this, KioskGuardActivity.class);
-                guardIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-                startActivity(guardIntent);
+                Intent unlockIntent = new Intent(this, UnlockActivity.class);
+                unlockIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                startActivity(unlockIntent);
                 finish();
                 return;
             }
@@ -93,9 +93,9 @@ public class MainActivity extends AppCompatActivity implements AppAdapter.OnAppS
         super.onResume();
         NativeKioskManager.init(getApplicationContext());
         if (NativeKioskManager.nativeIsKioskActive()) {
-            Intent guardIntent = new Intent(this, KioskGuardActivity.class);
-            guardIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-            startActivity(guardIntent);
+            Intent unlockIntent = new Intent(this, UnlockActivity.class);
+            unlockIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+            startActivity(unlockIntent);
             finish();
             return;
         }
@@ -473,14 +473,26 @@ public class MainActivity extends AppCompatActivity implements AppAdapter.OnAppS
             Log.e(TAG, "Error starting FloatingExitService", t);
         }
 
-        // Launch KioskGuardActivity as unkillable foundation which immediately launches target app
+        // Launch the selected kiosk target app directly!
         try {
-            Intent guardIntent = new Intent(this, KioskGuardActivity.class);
-            guardIntent.putExtra(KioskGuardActivity.EXTRA_AUTO_PIN, true);
-            guardIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-            startActivity(guardIntent);
+            Intent launchIntent = getPackageManager().getLaunchIntentForPackage(selectedApp.getPackageName());
+            if (launchIntent != null) {
+                launchIntent.addFlags(
+                        Intent.FLAG_ACTIVITY_NEW_TASK |
+                        Intent.FLAG_ACTIVITY_REORDER_TO_FRONT |
+                        Intent.FLAG_ACTIVITY_SINGLE_TOP
+                );
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P &&
+                        devicePolicyManager != null && devicePolicyManager.isDeviceOwnerApp(getPackageName())) {
+                    android.app.ActivityOptions options = android.app.ActivityOptions.makeBasic();
+                    options.setLockTaskEnabled(true);
+                    startActivity(launchIntent, options.toBundle());
+                } else {
+                    startActivity(launchIntent);
+                }
+            }
         } catch (Throwable e) {
-            Log.e(TAG, "Error launching KioskGuardActivity", e);
+            Log.e(TAG, "Error launching target kiosk app", e);
         }
 
         Toast.makeText(this, "Kiosk Mode aktif untuk " + selectedApp.getAppName(), Toast.LENGTH_LONG).show();

@@ -22,6 +22,9 @@ import android.widget.ImageView;
 import androidx.annotation.Nullable;
 import androidx.core.app.NotificationCompat;
 
+import android.os.Handler;
+import android.os.Looper;
+
 public class FloatingExitService extends Service {
 
     private static final String TAG = "FloatingExitService";
@@ -31,6 +34,18 @@ public class FloatingExitService extends Service {
 
     private WindowManager windowManager;
     private View floatingView;
+    private final Handler watchdogHandler = new Handler(Looper.getMainLooper());
+    private boolean isWatchdogRunning = false;
+    private long lastRedirectTime = 0;
+
+    private final Runnable watchdogRunnable = new Runnable() {
+        @Override
+        public void run() {
+            if (!isWatchdogRunning) return;
+            checkKioskEnforcement();
+            watchdogHandler.postDelayed(this, 350);
+        }
+    };
 
     @Override
     public void onCreate() {
@@ -40,9 +55,82 @@ public class FloatingExitService extends Service {
             createNotificationChannel();
             startAsForeground();
             setupFloatingView();
+            startWatchdog();
         } catch (Throwable t) {
             Log.e(TAG, "Error in onCreate", t);
         }
+    }
+
+    private void startWatchdog() {
+        if (!isWatchdogRunning) {
+            isWatchdogRunning = true;
+            watchdogHandler.postDelayed(watchdogRunnable, 500);
+            Log.d(TAG, "Kiosk watchdog started.");
+        }
+    }
+
+    private void stopWatchdog() {
+        isWatchdogRunning = false;
+        watchdogHandler.removeCallbacks(watchdogRunnable);
+        Log.d(TAG, "Kiosk watchdog stopped.");
+    }
+
+    private void checkKioskEnforcement() {
+        try {
+            NativeKioskManager.init(getApplicationContext());
+            if (!NativeKioskManager.nativeIsKioskActive()) {
+                stopSelf();
+                return;
+            }
+
+            // If user is currently on UnlockActivity keypad, don't interrupt!
+            if (UnlockActivity.isUnlockScreenActive) {
+                return;
+            }
+
+            String targetPackage = NativeKioskManager.nativeGetTargetPackage();
+            if (targetPackage == null || targetPackage.isEmpty()) return;
+
+            // Check if target app or unlock screen is in foreground
+            boolean isForeground = checkIsForeground(targetPackage);
+            if (!isForeground) {
+                long now = System.currentTimeMillis();
+                if (now - lastRedirectTime > 600) {
+                    lastRedirectTime = now;
+                    Log.w(TAG, "Screen pinning unpinned or user exited target app! Intercepting with PIN unlock screen...");
+                    Intent unlockIntent = new Intent(this, UnlockActivity.class);
+                    unlockIntent.addFlags(
+                            Intent.FLAG_ACTIVITY_NEW_TASK |
+                            Intent.FLAG_ACTIVITY_REORDER_TO_FRONT |
+                            Intent.FLAG_ACTIVITY_SINGLE_TOP
+                    );
+                    startActivity(unlockIntent);
+                }
+            }
+        } catch (Throwable t) {
+            Log.e(TAG, "Error in checkKioskEnforcement", t);
+        }
+    }
+
+    private boolean checkIsForeground(String targetPackage) {
+        try {
+            android.app.ActivityManager am = (android.app.ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
+            if (am != null) {
+                java.util.List<android.app.ActivityManager.RunningAppProcessInfo> procs = am.getRunningAppProcesses();
+                if (procs != null) {
+                    for (android.app.ActivityManager.RunningAppProcessInfo p : procs) {
+                        if (p.importance == android.app.ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND) {
+                            for (String pkg : p.pkgList) {
+                                if (pkg.equals(targetPackage) || pkg.equals(getPackageName())) {
+                                    return true;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (Throwable ignored) {}
+        return false;
     }
 
     private void startAsForeground() {
@@ -57,10 +145,12 @@ public class FloatingExitService extends Service {
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         if (intent != null && ACTION_STOP.equals(intent.getAction())) {
+            stopWatchdog();
             stopSelf();
             return START_NOT_STICKY;
         }
         setupFloatingView();
+        startWatchdog();
         return START_STICKY;
     }
 
@@ -204,6 +294,7 @@ public class FloatingExitService extends Service {
     @Override
     public void onDestroy() {
         super.onDestroy();
+        stopWatchdog();
         if (floatingView != null && windowManager != null) {
             try {
                 windowManager.removeView(floatingView);
