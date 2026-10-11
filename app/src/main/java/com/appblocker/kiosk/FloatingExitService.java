@@ -1,5 +1,6 @@
 package com.appblocker.kiosk;
 
+import android.app.ActivityManager;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
@@ -37,6 +38,8 @@ public class FloatingExitService extends Service {
     private final Handler watchdogHandler = new Handler(Looper.getMainLooper());
     private boolean isWatchdogRunning = false;
     private long lastRedirectTime = 0;
+
+    private boolean wasLockTaskActive = false;
 
     private final Runnable watchdogRunnable = new Runnable() {
         @Override
@@ -88,16 +91,25 @@ public class FloatingExitService extends Service {
                 return;
             }
 
-            String targetPackage = NativeKioskManager.nativeGetTargetPackage();
-            if (targetPackage == null || targetPackage.isEmpty()) return;
+            int lockState = ActivityManager.LOCK_TASK_MODE_NONE;
+            ActivityManager am = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && am != null) {
+                lockState = am.getLockTaskModeState();
+            }
 
-            // Check if target app or unlock screen is in foreground
-            boolean isForeground = checkIsForeground(targetPackage);
-            if (!isForeground) {
+            if (lockState != ActivityManager.LOCK_TASK_MODE_NONE) {
+                // Target app is securely pinned / locked in kiosk mode!
+                wasLockTaskActive = true;
+                return;
+            }
+
+            // If screen was pinned, but now unpinned by user (e.g. pulled up / unpinned gesture)
+            if (wasLockTaskActive) {
+                wasLockTaskActive = false; // Reset immediately to prevent popup spam!
                 long now = System.currentTimeMillis();
-                if (now - lastRedirectTime > 600) {
+                if (now - lastRedirectTime > 1000) {
                     lastRedirectTime = now;
-                    Log.w(TAG, "Screen pinning unpinned or user exited target app! Intercepting with PIN unlock screen...");
+                    Log.w(TAG, "Screen pinning was unpinned by user! Intercepting with PIN unlock screen...");
                     Intent unlockIntent = new Intent(this, UnlockActivity.class);
                     unlockIntent.addFlags(
                             Intent.FLAG_ACTIVITY_NEW_TASK |
@@ -110,27 +122,6 @@ public class FloatingExitService extends Service {
         } catch (Throwable t) {
             Log.e(TAG, "Error in checkKioskEnforcement", t);
         }
-    }
-
-    private boolean checkIsForeground(String targetPackage) {
-        try {
-            android.app.ActivityManager am = (android.app.ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
-            if (am != null) {
-                java.util.List<android.app.ActivityManager.RunningAppProcessInfo> procs = am.getRunningAppProcesses();
-                if (procs != null) {
-                    for (android.app.ActivityManager.RunningAppProcessInfo p : procs) {
-                        if (p.importance == android.app.ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND) {
-                            for (String pkg : p.pkgList) {
-                                if (pkg.equals(targetPackage) || pkg.equals(getPackageName())) {
-                                    return true;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        } catch (Throwable ignored) {}
-        return false;
     }
 
     private void startAsForeground() {

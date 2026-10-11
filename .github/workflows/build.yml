@@ -76,41 +76,39 @@ jobs:
         run: |
           RAW_APK=$(find app/build/outputs/apk/debug -name "*.apk" | head -n 1)
           echo "Raw APK: $RAW_APK"
-          cp "$RAW_APK" AppBlocker-v2.0.8.apk
+          cp "$RAW_APK" AppBlocker-v2.0.9.apk
           cp "$RAW_APK" AppBlocker.apk
-          echo "apk_path=AppBlocker-v2.0.8.apk" >> $GITHUB_OUTPUT
+          echo "apk_path=AppBlocker-v2.0.9.apk" >> $GITHUB_OUTPUT
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: AppBlocker-v2.0.8-apk
-          path: AppBlocker-v2.0.8.apk
+          name: AppBlocker-v2.0.9-apk
+          path: AppBlocker-v2.0.9.apk
           retention-days: 14
 
       - name: Publish to GitHub Releases
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v2.0.8
-          name: "App Blocker v2.0.8 (Direct Target App Launch & Unpin Watchdog Interceptor)"
+          tag_name: v2.0.9
+          name: "App Blocker v2.0.9 (Fix PIN Popup Spam & Accurate LockTask Unpin Detection)"
           body: |
-            ### 🚀 App Blocker v2.0.8 (Perbaikan Nyangkut di App Blocker & Cegah Keluar Saat Unpin)
+            ### 🚀 App Blocker v2.0.9 (Perbaikan Spam Pop-up PIN & Deteksi Unpin Akurat)
 
-            Pembaruan kritis untuk mengatasi 2 masalah utama:
-            1. Tidak lagi nyangkut di App Blocker saat Kiosk dimulai.
-            2. Mencegah pengguna keluar bebas ke launcher saat mematikan screen pinning (unpin).
-
-            **Pembaruan v2.0.8:**
-            - 🎯 **Peluncuran Aplikasi Target Secara Langsung:** Saat Kiosk dimulai, aplikasi target yang dipilih langsung dibuka penuh ke layar depan! Tidak ada lagi layar perantara yang membuat nyangkut di App Blocker.
-            - 🛡️ **Unpin Watchdog Interceptor:** Foreground Service kini memantau status aplikasi setiap 350ms. Saat pengguna menarik ke atas untuk mematikan screen pinning atau mencoba keluar ke launcher, sistem seketika menghadang layar dengan **Layar PIN Pengaman (UnlockActivity)** sehingga pengguna TIDAK BISA keluar bebas tanpa PIN!
-            - 🔒 **Enterprise LockTask Mode:** Dukungan penuh untuk Device Owner Lock Task via `ActivityOptions`.
-            - 🚫 **Zero Accessibility:** Bebas Aksesibilitas sepenuhnya.
+            Pembaruan kritis untuk mengatasi bug pop-up minta PIN yang muncul terus-menerus secara spam:
+            
+            **Pembaruan v2.0.9:**
+            - 🛡️ **Fix Pop-up PIN Spam:** Menghilangkan perulangan spam pop-up PIN. Sistem sekarang menggunakan transisi status resmi `getLockTaskModeState()` Android untuk mendeteksi kapan aplikasi benar-benar di-unpin.
+            - 🔒 **Zero Spam During Kiosk:** Selama aplikasi target aktif dan disematkan (Screen Pinning / LockTaskMode), pop-up PIN TIDAK AKAN mengganggu atau muncul sama sekali.
+            - ⛔ **Unpin Interceptor:** Saat pengguna sengaja mematikan sematan layar (gestur tarik ke atas / unpin), layar seketika dihadang oleh **Layar PIN (UnlockActivity)** tepat 1 kali tanpa perulangan spam.
+            - 🚫 **Bebas Aksesibilitas:** Tetap 100% tanpa izin Aksesibilitas.
             - 📲 **In-App Update:** Update langsung melalui tombol Cek Pembaruan di aplikasi.
 
             **Unduh APK:**
-            Unduh file **AppBlocker-v2.0.8.apk** di bawah ini.
+            Unduh file **AppBlocker-v2.0.9.apk** di bawah ini.
           files: |
-            AppBlocker-v2.0.8.apk
+            AppBlocker-v2.0.9.apk
             AppBlocker.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
