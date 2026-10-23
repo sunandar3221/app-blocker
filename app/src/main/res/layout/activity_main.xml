@@ -91,41 +91,6 @@
             android:textSize="14sp"
             android:textStyle="bold" />
 
-        <!-- Device Admin Row -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
-            android:gravity="center_vertical"
-            android:orientation="horizontal">
-
-            <TextView
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="1. Device Admin"
-                android:textColor="@color/text_primary"
-                android:textSize="13sp" />
-
-            <TextView
-                android:id="@+id/tvStatusAdmin"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginEnd="10dp"
-                android:text="Memeriksa..."
-                android:textSize="12sp"
-                android:textStyle="bold" />
-
-            <Button
-                android:id="@+id/btnGrantAdmin"
-                style="@style/Widget.MaterialComponents.Button.TextButton"
-                android:layout_width="wrap_content"
-                android:layout_height="36dp"
-                android:text="Aktifkan"
-                android:textColor="@color/accent"
-                android:textSize="12sp" />
-        </LinearLayout>
-
         <!-- Accessibility Row -->
         <LinearLayout
             android:layout_width="match_parent"
@@ -138,7 +103,7 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="2. Aksesibilitas"
+                android:text="1. Aksesibilitas"
                 android:textColor="@color/text_primary"
                 android:textSize="13sp" />
 
@@ -173,7 +138,7 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="3. Overlay / Floating"
+                android:text="2. Overlay / Floating"
                 android:textColor="@color/text_primary"
                 android:textSize="13sp" />
 
@@ -208,7 +173,7 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="4. Tetap Aktif (Anti Mati)"
+                android:text="3. Tetap Aktif (Anti Mati)"
                 android:textColor="@color/text_primary"
                 android:textSize="13sp" />
 

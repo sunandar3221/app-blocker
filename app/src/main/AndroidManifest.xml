@@ -66,19 +66,6 @@
                 android:resource="@xml/accessibility_service_config" />
         </service>
 
-        <!-- Device Admin Receiver -->
-        <receiver
-            android:name=".KioskDeviceAdminReceiver"
-            android:permission="android.permission.BIND_DEVICE_ADMIN"
-            android:exported="true">
-            <meta-data
-                android:name="android.app.device_admin"
-                android:resource="@xml/device_admin_sample" />
-            <intent-filter>
-                <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
-            </intent-filter>
-        </receiver>
-
         <!-- Boot Receiver to maintain kiosk mode across reboots -->
         <receiver
             android:name=".BootReceiver"

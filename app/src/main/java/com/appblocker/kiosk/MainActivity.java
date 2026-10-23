@@ -2,8 +2,6 @@ package com.appblocker.kiosk;
 
 import android.accessibilityservice.AccessibilityServiceInfo;
 import android.app.Dialog;
-import android.app.admin.DevicePolicyManager;
-import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -38,14 +36,9 @@ public class MainActivity extends AppCompatActivity implements AppAdapter.OnAppS
 
     private static final String TAG = "MainActivity";
 
-    private ComponentName adminComponent;
-    private DevicePolicyManager devicePolicyManager;
-
-    private TextView tvStatusAdmin;
     private TextView tvStatusAccessibility;
     private TextView tvStatusOverlay;
     private TextView tvStatusBattery;
-    private Button btnGrantAdmin;
     private Button btnGrantAccessibility;
     private Button btnGrantOverlay;
     private Button btnGrantBattery;
@@ -77,9 +70,6 @@ public class MainActivity extends AppCompatActivity implements AppAdapter.OnAppS
 
         setContentView(R.layout.activity_main);
 
-        devicePolicyManager = (DevicePolicyManager) getSystemService(Context.DEVICE_POLICY_SERVICE);
-        adminComponent = new ComponentName(this, KioskDeviceAdminReceiver.class);
-
         initViews();
         checkFirstTimePin();
         loadInstalledApps();
@@ -104,12 +94,10 @@ public class MainActivity extends AppCompatActivity implements AppAdapter.OnAppS
     }
 
     private void initViews() {
-        tvStatusAdmin = findViewById(R.id.tvStatusAdmin);
         tvStatusAccessibility = findViewById(R.id.tvStatusAccessibility);
         tvStatusOverlay = findViewById(R.id.tvStatusOverlay);
         tvStatusBattery = findViewById(R.id.tvStatusBattery);
 
-        btnGrantAdmin = findViewById(R.id.btnGrantAdmin);
         btnGrantAccessibility = findViewById(R.id.btnGrantAccessibility);
         btnGrantOverlay = findViewById(R.id.btnGrantOverlay);
         btnGrantBattery = findViewById(R.id.btnGrantBattery);
@@ -121,7 +109,6 @@ public class MainActivity extends AppCompatActivity implements AppAdapter.OnAppS
 
         rvApps.setLayoutManager(new LinearLayoutManager(this));
 
-        btnGrantAdmin.setOnClickListener(v -> requestDeviceAdmin());
         btnGrantAccessibility.setOnClickListener(v -> requestAccessibility());
         btnGrantOverlay.setOnClickListener(v -> requestOverlay());
         btnGrantBattery.setOnClickListener(v -> requestIgnoreBatteryOptimizations());
@@ -264,19 +251,8 @@ public class MainActivity extends AppCompatActivity implements AppAdapter.OnAppS
     }
 
     private void updatePermissionsUI() {
-        boolean isAdmin = isAdminActive();
         boolean isAccessibility = isAccessibilityServiceEnabled();
         boolean isOverlay = canDrawOverlays();
-
-        if (isAdmin) {
-            tvStatusAdmin.setText("✓ Aktif");
-            tvStatusAdmin.setTextColor(Color.parseColor("#4CAF50"));
-            btnGrantAdmin.setVisibility(View.GONE);
-        } else {
-            tvStatusAdmin.setText("✗ Belum Aktif");
-            tvStatusAdmin.setTextColor(Color.parseColor("#EF4444"));
-            btnGrantAdmin.setVisibility(View.VISIBLE);
-        }
 
         if (isAccessibility) {
             tvStatusAccessibility.setText("✓ Aktif");
@@ -309,7 +285,7 @@ public class MainActivity extends AppCompatActivity implements AppAdapter.OnAppS
             btnGrantBattery.setVisibility(View.VISIBLE);
         }
 
-        btnStartKiosk.setEnabled(isAdmin && isAccessibility && isOverlay && selectedApp != null);
+        btnStartKiosk.setEnabled(isAccessibility && isOverlay && selectedApp != null);
     }
 
     private boolean isIgnoringBatteryOptimizations() {
@@ -333,10 +309,6 @@ public class MainActivity extends AppCompatActivity implements AppAdapter.OnAppS
                 } catch (Throwable ignored) {}
             }
         }
-    }
-
-    private boolean isAdminActive() {
-        return devicePolicyManager != null && devicePolicyManager.isAdminActive(adminComponent);
     }
 
     private boolean isAccessibilityServiceEnabled() {
@@ -384,14 +356,6 @@ public class MainActivity extends AppCompatActivity implements AppAdapter.OnAppS
             return Settings.canDrawOverlays(this);
         }
         return true;
-    }
-
-    private void requestDeviceAdmin() {
-        Intent intent = new Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN);
-        intent.putExtra(DevicePolicyManager.EXTRA_DEVICE_ADMIN, adminComponent);
-        intent.putExtra(DevicePolicyManager.EXTRA_ADD_EXPLANATION,
-                "Device Admin diperlukan untuk mengamankan dan mengunci Kiosk Mode App Blocker.");
-        startActivity(intent);
     }
 
     private void requestAccessibility() {
@@ -454,12 +418,6 @@ public class MainActivity extends AppCompatActivity implements AppAdapter.OnAppS
         if (!NativeKioskManager.nativeHasPin()) {
             Toast.makeText(this, "Harap buat PIN terlebih dahulu!", Toast.LENGTH_SHORT).show();
             showSetPinDialog(false);
-            return;
-        }
-
-        if (!isAdminActive()) {
-            Toast.makeText(this, "Harap aktifkan izin Device Admin!", Toast.LENGTH_SHORT).show();
-            requestDeviceAdmin();
             return;
         }
 
